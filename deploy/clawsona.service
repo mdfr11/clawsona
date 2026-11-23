@@ -1,0 +1,15 @@
+[Unit]
+Description=ClawSona voice companion for OpenClaw
+After=pipewire.service pipewire-pulse.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/clawsona
+ExecStart=%h/.local/bin/uv run --frozen --no-sync clawsona
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,28 @@
+name: Bug report
+description: Report a reproducible problem in ClawSona.
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Do not include API keys, .env files, account tokens or private conversations.
+        For vulnerabilities, follow SECURITY.md instead.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS/architecture, Python, ClawSona and OpenClaw versions; STT/TTS providers.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include relevant non-secret settings and expected versus actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Optional doctor output, timing events or minimal logs with private text removed.
+      render: text

@@ -1,0 +1,11 @@
+{
+  "id": "clawsona-tools",
+  "name": "ClawSona tools for OpenClaw",
+  "description": "Weather, web search and personal Yandex Music playback",
+  "configSchema": {
+    "type": "object", "additionalProperties": false,
+    "required": ["baseUrl", "token"],
+    "properties": {"baseUrl": {"type": "string"}, "token": {"type": "string"}}
+  },
+  "uiHints": {"token": {"sensitive": true}}
+}

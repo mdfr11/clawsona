@@ -1,0 +1,7 @@
+{
+  "name": "clawsona-tools",
+  "version": "0.3.0",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "openclaw": {"extensions": ["./index.js"]}
+}

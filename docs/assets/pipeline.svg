@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="210" viewBox="0 0 1200 210" role="img" aria-labelledby="title desc">
+  <title id="title">The ClawSona voice pipeline</title>
+  <desc id="desc">Microphone audio is transcribed locally by Whisper, routed to OpenClaw for reasoning and tools, then spoken by local Piper or optional ElevenLabs.</desc>
+  <rect width="1200" height="210" rx="22" fill="#f4f6f7"/>
+  <g font-family="Arial,Helvetica,sans-serif">
+    <g fill="#fff" stroke="#dfe4e6"><rect x="28" y="55" width="226" height="102" rx="17"/><rect x="334" y="55" width="226" height="102" rx="17"/><rect x="640" y="55" width="226" height="102" rx="17"/><rect x="946" y="55" width="226" height="102" rx="17"/></g>
+    <g fill="#172121" font-size="25" font-weight="700" text-anchor="middle"><text x="141" y="100">Your voice</text><text x="447" y="100">Whisper</text><text x="753" y="100">OpenClaw</text><text x="1059" y="100">A spoken reply</text></g>
+    <g fill="#647074" font-size="16" text-anchor="middle"><text x="141" y="131">Silero speech detection</text><text x="447" y="131">Local transcription</text><text x="753" y="131">Model + context + tools</text><text x="1059" y="131">Piper / ElevenLabs</text></g>
+  </g>
+  <g fill="none" stroke="#ee5a36" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M273 106h40m-8-7 8 7-8 7M579 106h40m-8-7 8 7-8 7M885 106h40m-8-7 8 7-8 7"/></g>
+</svg>

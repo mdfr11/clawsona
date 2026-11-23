@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.11.3"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install PortAudio (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
+      - name: Install dependencies
+        run: uv sync --frozen --all-extras
+      - name: Lint and format
+        run: |
+          uv run --no-sync ruff check src tests scripts
+          uv run --no-sync ruff format --check src tests scripts
+      - name: Unit tests
+        run: uv run --no-sync pytest -q
+      - name: Base installation and CLI compatibility
+        run: |
+          uv sync --frozen
+          uv run --no-sync clawsona --help
+          uv run --no-sync lyutik --help
+          uv run --no-sync pytest -q
+
+  distribution:
+    name: Plugin and distribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.11.3"
+      - name: Check plugin syntax
+        run: |
+          node --check openclaw/clawsona-tools/index.js
+          node --check website/app.js
+      - name: Build and inspect archives
+        run: |
+          uv build --out-dir dist
+          python scripts/check_distribution.py dist
+          python scripts/build_site.py
+      - name: Install the wheel outside the checkout
+        run: |
+          uv export --frozen --no-dev --no-emit-project --no-hashes --output-file /tmp/clawsona-requirements.txt
+          uv venv --python 3.12 /tmp/clawsona-wheel
+          uv pip install --python /tmp/clawsona-wheel/bin/python --constraint /tmp/clawsona-requirements.txt dist/*.whl
+          cd /tmp
+          /tmp/clawsona-wheel/bin/clawsona --help
+          /tmp/clawsona-wheel/bin/lyutik --help
+          /tmp/clawsona-wheel/bin/python -c "from importlib.resources import files; assert files('clawsona').joinpath('openclaw_plugin/index.js').is_file()"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: clawsona-distribution
+          path: dist/*
+          if-no-files-found: error

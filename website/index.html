@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Give your OpenClaw a voice. ClawSona brings local speech, a configurable identity and natural follow-up conversation to your mini-PC."
+    />
+    <meta name="theme-color" content="#f5f7f8" />
+    <meta
+      property="og:title"
+      content="ClawSona — Give your OpenClaw a voice."
+    />
+    <meta
+      property="og:description"
+      content="Local speech. Your chosen name. An OpenClaw brain. An open-source voice companion for conversation and language practice."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="assets/social-card.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>ClawSona — Give your OpenClaw a voice.</title>
+    <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+    <header class="header wrap">
+      <a class="brand" href="#" aria-label="ClawSona home"
+        ><img
+          src="assets/mark.svg"
+          alt=""
+          width="36"
+          height="36"
+        />ClawSona<span class="alpha">ALPHA</span></a
+      >
+      <nav aria-label="Main navigation">
+        <a href="#conversation" data-i18n="nav_demo">The conversation</a>
+        <a href="#how-it-works" data-i18n="nav_how">Under the hood</a>
+        <button class="language" id="language" aria-label="Switch to Russian">
+          EN <span>/ RU</span>
+        </button>
+        <a class="button small dark" href="#start" data-i18n="get_started"
+          >Get started</a
+        >
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero wrap">
+        <div class="hero-copy">
+          <p class="eyebrow">
+            <span class="mini-wave" aria-hidden="true">▂▅▇▃</span>
+            <span data-i18n="eyebrow">OPEN SOURCE · BUILT FOR OPENCLAW</span>
+          </p>
+          <h1 data-i18n-html="hero_title">
+            Give your<br />OpenClaw<br /><em>a voice.</em>
+          </h1>
+          <p class="lead" data-i18n="hero_description">
+            A little computer. A familiar voice. A companion to talk things
+            through, learn with, and put your OpenClaw tools to use.
+          </p>
+          <div class="hero-actions">
+            <a class="button dark" href="#start" data-i18n="get_started"
+              >Get started</a
+            ><a class="text-link" href="#conversation" data-i18n="hear_it"
+              >Hear the voice</a
+            >
+          </div>
+          <p class="hero-note" data-i18n="hero_note">
+            Local speech · Russian & English · Your choice of name
+          </p>
+        </div>
+        <div
+          class="voice-visual"
+          aria-label="An abstract orange voice waveform"
+        >
+          <div class="visual-label">
+            <span class="bracket">[</span
+            ><span data-i18n="visual_label"
+              >A voice, with a little personality.</span
+            ><span class="bracket">]</span>
+          </div>
+          <div class="voice-disc">
+            <div class="voice-bars" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+          </div>
+          <div class="floating-bubble user-bubble">
+            <span class="bubble-label" data-i18n="you">YOU</span
+            ><span data-i18n="hero_user">“Mira, let's talk.”</span>
+          </div>
+          <div class="floating-bubble reply-bubble">
+            <span class="bubble-label">CLAWSONA</span
+            ><span data-i18n="hero_reply"
+              >“Of course. What's on your mind?”</span
+            >
+            <div class="tiny-wave" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+          </div>
+          <p class="visual-caption" data-i18n="visual_caption">
+            Example dialogue. The name is yours to choose.
+          </p>
+        </div>
+      </section>
+
+      <section class="principles wrap" aria-label="Core features">
+        <div>
+          <span class="feature-icon" aria-hidden="true">◉</span>
+          <div>
+            <strong data-i18n="principle_1">Speech stays close to home.</strong>
+            <p data-i18n="principle_1_text">
+              Whisper listens locally. Piper speaks locally.
+            </p>
+          </div>
+        </div>
+        <div>
+          <span class="feature-icon" aria-hidden="true">✳</span>
+          <div>
+            <strong data-i18n="principle_2">OpenClaw does the thinking.</strong>
+            <p data-i18n="principle_2_text">
+              One agent for context, the model and tools.
+            </p>
+          </div>
+        </div>
+        <div>
+          <span class="feature-icon" aria-hidden="true">≈</span>
+          <div>
+            <strong data-i18n="principle_3">Make the voice your own.</strong>
+            <p data-i18n="principle_3_text">
+              Your name. Your voice. Your pace.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="conversation" class="conversation section wrap">
+        <div class="section-intro">
+          <p class="eyebrow" data-i18n="conversation_kicker">
+            LESS TYPING. MORE TALKING.
+          </p>
+          <h2 data-i18n-html="conversation_title">
+            Say the name.<br />Keep the conversation.
+          </h2>
+          <p data-i18n="conversation_description">
+            You don't need a wake word before every thought. Address your
+            companion once, then explore an idea, learn something new, or use a
+            connected OpenClaw tool.
+          </p>
+        </div>
+        <div class="conversation-stage">
+          <div
+            class="scenario-tabs"
+            role="tablist"
+            aria-label="Example conversations"
+          >
+            <button
+              id="tab-talk"
+              class="scenario active"
+              role="tab"
+              aria-selected="true"
+              aria-controls="dialogue"
+              data-scenario="talk"
+              data-i18n="tab_talk"
+            >
+              Just talk
+            </button>
+            <button
+              id="tab-learn"
+              class="scenario"
+              role="tab"
+              aria-selected="false"
+              aria-controls="dialogue"
+              tabindex="-1"
+              data-scenario="learn"
+              data-i18n="tab_learn"
+            >
+              Learn Spanish
+            </button>
+            <button
+              id="tab-weather"
+              class="scenario"
+              role="tab"
+              aria-selected="false"
+              aria-controls="dialogue"
+              tabindex="-1"
+              data-scenario="weather"
+              data-i18n="tab_weather"
+            >
+              Ask the world
+            </button>
+            <button
+              id="tab-music"
+              class="scenario"
+              role="tab"
+              aria-selected="false"
+              aria-controls="dialogue"
+              tabindex="-1"
+              data-scenario="music"
+              data-i18n="tab_music"
+            >
+              Music &amp; more
+            </button>
+          </div>
+          <div
+            class="dialogue"
+            id="dialogue"
+            role="tabpanel"
+            aria-labelledby="tab-talk"
+            tabindex="0"
+          >
+            <div id="messages"></div>
+          </div>
+          <div class="demo-caption">
+            <span data-i18n="illustration_note"
+              >Illustrative conversation, not a live AI connection.</span
+            ><span class="language-tag" id="sample-language">RU + EN</span>
+          </div>
+          <p class="scenario-note" id="scenario-note" hidden></p>
+          <div class="listen-panel">
+            <div>
+              <strong data-i18n="listen_title"
+                >This part is real. Press play.</strong
+              >
+              <p id="voice-description">ElevenLabs · Roger · Russian</p>
+            </div>
+            <audio
+              id="voice-sample"
+              controls
+              preload="none"
+              aria-label="ElevenLabs voice sample"
+              src="media/hello-ru.mp3"
+            ></audio>
+          </div>
+          <p class="sample-note" data-i18n="sample_note">
+            Actual ElevenLabs samples, synthesized from public demo text. Local
+            Piper is also available. This page does not request microphone
+            access.
+          </p>
+        </div>
+      </section>
+
+      <section id="how-it-works" class="how-section">
+        <div class="wrap">
+          <div class="how-heading">
+            <div>
+              <p class="eyebrow" data-i18n="how_kicker">
+                SMALL MACHINE. CLEAR RESPONSIBILITIES.
+              </p>
+              <h2 data-i18n-html="how_title">
+                A voice layer.<br />An OpenClaw brain.
+              </h2>
+            </div>
+            <p data-i18n="how_description">
+              ClawSona handles the microphone, speech and playback. OpenClaw
+              manages the conversation and chooses when a tool is needed. Each
+              part has a job.
+            </p>
+          </div>
+          <div class="pipeline">
+            <div class="pipeline-step">
+              <span class="pipeline-type" data-i18n="pipeline_local"
+                >ON YOUR DEVICE</span
+              ><strong data-i18n="pipeline_1">Your voice</strong>
+              <p data-i18n="pipeline_1_text">
+                Silero detects speech.<br />Whisper turns it into text.
+              </p>
+              <span class="pipeline-detail">Silero VAD · faster-whisper</span>
+            </div>
+            <span class="connector" aria-hidden="true">→</span>
+            <div class="pipeline-step agent">
+              <span class="pipeline-type" data-i18n="pipeline_agent"
+                >THE AGENT</span
+              ><strong>OpenClaw</strong>
+              <p data-i18n="pipeline_2_text">
+                Context, model requests<br />and bounded tool calls.
+              </p>
+              <span class="pipeline-detail" data-i18n="pipeline_model"
+                >Default model: DeepSeek API</span
+              >
+            </div>
+            <span class="connector" aria-hidden="true">→</span>
+            <div class="pipeline-step">
+              <span class="pipeline-type" data-i18n="pipeline_reply"
+                >BACK TO YOUR SPEAKER</span
+              ><strong data-i18n="pipeline_3">A spoken reply</strong>
+              <p data-i18n="pipeline_3_text">
+                Local bilingual Piper.<br />Or optional ElevenLabs.
+              </p>
+              <span class="pipeline-detail">Piper · ElevenLabs</span>
+            </div>
+          </div>
+          <div class="data-note">
+            <span aria-hidden="true">⌁</span>
+            <p data-i18n="data_note">
+              Speech recognition is local. Recognized requests go to your
+              configured model. OpenClaw keeps session history. Cloud voices
+              send reply text to their provider.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="start" class="start section wrap">
+        <div class="section-intro">
+          <p class="eyebrow" data-i18n="start_kicker">
+            YOUR NEXT CONVERSATION STARTS HERE.
+          </p>
+          <h2 data-i18n-html="start_title">
+            Bring a mini-PC.<br />Give it a name.
+          </h2>
+          <p data-i18n="start_description">
+            Start with local speech and the official DeepSeek API through
+            OpenClaw. No extra speech subscription required.
+          </p>
+          <div class="requirements">
+            <strong data-i18n="requirements_title">What you'll need</strong>
+            <p data-i18n="requirements">
+              Python 3.11–3.13, uv, OpenClaw, a microphone and speakers. Target
+              platforms: Linux and macOS.
+            </p>
+            <p data-i18n="provider_note">
+              The code is free. Hosted model and optional voice APIs have
+              separate charges.
+            </p>
+          </div>
+          <a
+            class="button outline"
+            id="source-download"
+            href="downloads/clawsona-0.3.0.tar.gz"
+            download
+            data-i18n="download_source"
+            >Download source · v0.3.0</a
+          ><a
+            class="text-link repo-link"
+            hidden
+            data-repo-url
+            data-i18n="view_github"
+            >View on GitHub</a
+          >
+        </div>
+        <div class="setup-steps">
+          <details open>
+            <summary>
+              <span data-i18n="setup_1">Prepare your checkout</span
+              ><span class="step-state" data-i18n="setup_once">ONCE</span>
+            </summary>
+            <div class="step-content">
+              <p data-i18n="setup_1_note">
+                Unpack the source and open a terminal in that folder. Install
+                PortAudio first: Debian/Ubuntu libportaudio2, or macOS brew
+                install portaudio.
+              </p>
+              <div class="code-block">
+                <button class="copy" data-copy="install" data-i18n="copy">
+                  Copy
+                </button>
+                <pre><code id="install">uv python install 3.12
+uv sync --python 3.12 --frozen
+cp -n .env.example .env</code></pre>
+              </div>
+            </div>
+          </details>
+          <details open>
+            <summary>
+              <span data-i18n="setup_2">Pick an identity</span
+              ><span class="step-state">.ENV</span>
+            </summary>
+            <div class="step-content">
+              <p data-i18n="setup_2_note">
+                Add your own DeepSeek API key to .env. Then choose a name and
+                optional spellings:
+              </p>
+              <div class="code-block light">
+                <button class="copy" data-copy="identity" data-i18n="copy">
+                  Copy
+                </button>
+                <pre><code id="identity">ASSISTANT_NAME=Мира
+ASSISTANT_ALIASES=Mira</code></pre>
+              </div>
+            </div>
+          </details>
+          <details>
+            <summary>
+              <span data-i18n="setup_3">Prepare models. Start talking.</span
+              ><span class="step-state" data-i18n="setup_run">RUN</span>
+            </summary>
+            <div class="step-content">
+              <p data-i18n="setup_3_note">
+                Install OpenClaw using its official guide. Setup creates a
+                dedicated profile and downloads the speech models once.
+              </p>
+              <div class="code-block">
+                <button class="copy" data-copy="launch" data-i18n="copy">
+                  Copy
+                </button>
+                <pre><code id="launch">uv run clawsona setup
+uv run clawsona openclaw-setup
+uv run clawsona doctor
+uv run clawsona</code></pre>
+              </div>
+              <a
+                class="text-link"
+                href="https://docs.openclaw.ai/install"
+                target="_blank"
+                rel="noreferrer"
+                data-i18n="openclaw_install"
+                >OpenClaw installation guide</a
+              >
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="faq wrap" aria-labelledby="faq-title">
+        <div>
+          <p class="eyebrow" data-i18n="faq_kicker">GOOD TO KNOW</p>
+          <h2 id="faq-title" data-i18n="faq_title">A few honest answers.</h2>
+        </div>
+        <div class="faq-items">
+          <details>
+            <summary data-i18n="faq_1_q">Does everything run offline?</summary>
+            <p data-i18n="faq_1_a">
+              Whisper and Piper run locally after downloading the models. The
+              default DeepSeek model, weather and search require internet.
+              Direct Ollama mode can use a local model, without OpenClaw tools.
+            </p>
+          </details>
+          <details>
+            <summary data-i18n="faq_2_q">
+              Can I interrupt it while it speaks?
+            </summary>
+            <p data-i18n="faq_2_a">
+              Not yet. The microphone is closed during playback. Barge-in and
+              acoustic echo cancellation are not implemented. This is an
+              early-stage project, and nearby speech can still cause false
+              activations.
+            </p>
+          </details>
+          <details>
+            <summary data-i18n="faq_3_q">
+              Is it ready for every mini-PC?
+            </summary>
+            <p data-i18n="faq_3_a">
+              CPU, microphone placement and noise matter. Whisper small with
+              four CPU threads is the starting point. Test the real dialogue on
+              your device and adjust the model, voice and pause length. No
+              universal latency is promised.
+            </p>
+          </details>
+          <details>
+            <summary data-i18n="faq_4_q">
+              What about music and other actions?
+            </summary>
+            <p data-i18n="faq_4_a">
+              Weather and search are available through bounded tools. Yandex
+              Music is experimental, disabled by default, and has not been
+              validated end to end. The generated profile does not enable shell
+              or arbitrary file access.
+            </p>
+          </details>
+          <details>
+            <summary data-i18n="faq_5_q">
+              Is ClawSona free and open source?
+            </summary>
+            <p data-i18n="faq_5_a">
+              The application is GPL-3.0-or-later: free to use, modify and
+              redistribute under that license. Dependencies and voice models
+              have their own terms. Provider API usage and subscriptions are
+              separate.
+            </p>
+          </details>
+        </div>
+      </section>
+      <section class="closing wrap">
+        <img src="assets/mark.svg" width="48" height="48" alt="" />
+        <h2 data-i18n="closing">A little more human.<br />A lot more yours.</h2>
+        <a class="button dark" href="#start" data-i18n="get_started"
+          >Get started</a
+        >
+      </section>
+    </main>
+    <footer class="footer wrap">
+      <a class="brand" href="#"
+        ><img src="assets/mark.svg" width="28" height="28" alt="" />ClawSona</a
+      >
+      <p data-i18n="footer_note">
+        Independent project built around OpenClaw. Early-stage software, shared
+        openly.
+      </p>
+      <span>GPL-3.0-or-later</span>
+    </footer>
+    <div class="sr-only" role="status" aria-live="polite" id="status"></div>
+  </body>
+</html>
