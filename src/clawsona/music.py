@@ -22,6 +22,15 @@ class YandexMusicPlayer:
         self._manual_token = config.yandex_music_token
         self._token = config.yandex_music_token or saved_token()
         self._volume = config.music_volume
+        self._effective_volume = float(self._volume)
+        self._speech_mode = config.music_speech_mode
+        self._duck_ratio = config.music_duck_ratio
+        self._fade_duration = config.music_fade_duration_ms / 1000
+        self._auto_next = config.music_auto_next
+        self._auto_task = None
+        self._closing = False
+        self._auto_wakeup = asyncio.Event()
+        self._auto_wakeup.set()
         self._client = None
         self._track = None
         self._queue = []
@@ -106,13 +115,134 @@ class YandexMusicPlayer:
     async def _load(self, queue, index, track, url):
         try:
             await self._playback.load(
-                url, volume=self._volume, paused=self._speech_depth > 0
+                url,
+                volume=self._target_volume(),
+                paused=self._speech_depth > 0 and self._speech_mode == "pause",
             )
         except BaseException:
             self._track = None
             raise
         self._queue, self._queue_index = queue, index
         self._track, self._paused = track, False
+        self._effective_volume = self._target_volume()
+        self._auto_wakeup.set()
+        self._ensure_auto_next()
+
+    def _ensure_auto_next(self):
+        if (
+            self._auto_next
+            and self._track is not None
+            and not self._closing
+            and (self._auto_task is None or self._auto_task.done())
+        ):
+            self._auto_task = asyncio.create_task(self._advance_loop())
+            self._auto_task.add_done_callback(self._auto_finished)
+
+    def _auto_finished(self, task):
+        if self._auto_task is task:
+            self._auto_task = None
+        if not task.cancelled() and task.exception() is not None:
+            logger.warning(
+                "Наблюдение за музыкальной очередью остановлено из-за ошибки"
+            )
+            return
+        self._ensure_auto_next()
+
+    async def _advance_loop(self):
+        while True:
+            entry_id, reason = await self._playback.next_end()
+            if reason == "shutdown":
+                async with self._lock:
+                    if entry_id == self._playback.entry_id:
+                        self._track = None
+                continue
+            if reason != "eof":
+                if reason in {"error", "quit"}:
+                    async with self._lock:
+                        if entry_id == self._playback.entry_id:
+                            self._track = None
+                            logger.warning("Воспроизведение музыки прервано")
+                continue
+            async with self._lock:
+                if (
+                    self._closing
+                    or self._track is None
+                    or entry_id != self._playback.entry_id
+                ):
+                    continue
+                queue, start = self._queue, self._queue_index + 1
+            try:
+                # Resolve outside the control lock so stop/pause can still run
+                # while the provider is responding. Recheck identity afterwards.
+                prepared = (
+                    await asyncio.to_thread(self._select_track, queue, start)
+                    if start < len(queue)
+                    else None
+                )
+                while True:
+                    await self._auto_wakeup.wait()
+                    async with self._lock:
+                        if (
+                            self._closing
+                            or self._track is None
+                            or entry_id != self._playback.entry_id
+                        ):
+                            break
+                        if self._paused:
+                            self._auto_wakeup.clear()
+                            continue
+                        if prepared is None:
+                            await self._playback.stop()
+                            self._track = None
+                            logger.info("Очередь музыки завершена")
+                        else:
+                            async with asyncio.timeout(30):
+                                await self._load(queue, *prepared)
+                            logger.info(
+                                "Автоматический переход к треку %d из %d",
+                                self._queue_index + 1,
+                                len(queue),
+                            )
+                        break
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                async with self._lock:
+                    if entry_id == self._playback.entry_id:
+                        await self._playback.close()
+                        self._track = None
+                logger.warning("Не удалось автоматически продолжить очередь музыки")
+                return
+
+    def _target_volume(self):
+        if self._speech_depth and self._speech_mode == "duck":
+            return self._volume * self._duck_ratio
+        return float(self._volume)
+
+    async def _apply_volume(self, target, *, smooth=False):
+        if target == self._effective_volume:
+            return
+        start = self._effective_volume
+        steps = (
+            max(1, min(10, round(self._fade_duration / 0.04)))
+            if smooth and self._fade_duration
+            else 1
+        )
+        for index in range(1, steps + 1):
+            value = start + (target - start) * index / steps
+            previous = self._effective_volume
+            # A cancelled IPC request may already have applied its value. Keep
+            # that target so the speech context will explicitly restore volume.
+            self._effective_volume = value
+            try:
+                await self._playback.set_volume(value)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                self._effective_volume = previous
+                raise
+            if steps > 1:
+                await asyncio.sleep(self._fade_duration / steps)
 
     async def command(
         self, action: str, query: str = "", *, volume=None, step=10
@@ -135,10 +265,12 @@ class YandexMusicPlayer:
             elif action == "stop":
                 await self._playback.stop()
                 self._track, self._paused = None, False
+                self._auto_wakeup.set()
             elif action in {"pause", "resume"}:
-                if self._track is not None and await self._playback.active():
+                if self._track is not None:
                     self._paused = action == "pause"
                     await self._sync_pause()
+                    self._auto_wakeup.set()
             elif action in {"volume_up", "volume_down", "set_volume"}:
                 if action == "set_volume":
                     if type(volume) is not int or not 0 <= volume <= 100:
@@ -157,28 +289,49 @@ class YandexMusicPlayer:
                             0, self._volume + (step if action == "volume_up" else -step)
                         ),
                     )
-                await self._playback.set_volume(desired)
+                await self._apply_volume(
+                    desired * self._duck_ratio
+                    if self._speech_depth and self._speech_mode == "duck"
+                    else desired
+                )
                 self._volume = desired
             elif action != "status":
                 raise MusicControlError("Неизвестная команда плеера")
             playing = self._track is not None and await self._playback.active()
             return {
                 "status": (
-                    "paused" if self._paused or self._speech_depth else "playing"
+                    "paused"
+                    if self._paused
+                    or (self._speech_depth and self._speech_mode == "pause")
+                    else "playing"
                 )
                 if playing
                 else "stopped",
                 "track": self._track if playing else None,
                 "volume": self._volume,
-                "paused_for_speech": bool(playing and self._speech_depth),
+                "paused_for_speech": bool(
+                    playing and self._speech_depth and self._speech_mode == "pause"
+                ),
+                "ducked_for_speech": bool(
+                    playing
+                    and self._speech_depth
+                    and self._speech_mode == "duck"
+                    and self._duck_ratio < 1
+                ),
+                "effective_volume": self._effective_volume if playing else 0,
                 "queue_position": self._queue_index + 1 if self._queue else 0,
                 "queue_length": len(self._queue),
+                "has_playback_context": self.has_playback_context,
             }
 
     async def _sync_pause(self):
         if self._track is not None:
             try:
-                await self._playback.set_paused(self._paused or self._speech_depth > 0)
+                await self._playback.set_paused(
+                    self._paused
+                    or (self._speech_depth > 0 and self._speech_mode == "pause")
+                )
+                await self._apply_volume(self._target_volume(), smooth=True)
             except (PlaybackError, OSError, TimeoutError):
                 logger.warning(
                     "Музыкальный плеер недоступен; останавливаю его перед озвучкой"
@@ -195,7 +348,10 @@ class YandexMusicPlayer:
                 entered = True
                 await self._sync_pause()
                 if self._track is not None and self._speech_depth == 1:
-                    logger.info("Музыка на паузе на время озвучки")
+                    logger.info(
+                        "Музыка на время озвучки: %s",
+                        "приглушение" if self._speech_mode == "duck" else "пауза",
+                    )
             yield
         finally:
             if entered:
@@ -204,6 +360,11 @@ class YandexMusicPlayer:
                     await self._sync_pause()
 
     async def close(self):
+        self._closing = True
+        task, self._auto_task = self._auto_task, None
+        if task is not None:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
         async with self._lock:
             self._track = None
             await self._playback.close()

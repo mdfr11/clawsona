@@ -18,6 +18,48 @@ class MpvPlayback:
         self._directory = None
         self._socket = None
         self._extra_args = tuple(extra_args)
+        self._entry_id = None
+        self._events = asyncio.Queue(maxsize=16)
+        self._monitor_task = None
+        self._instance = 0
+
+    @property
+    def entry_id(self):
+        return (self._instance, self._entry_id) if self._entry_id is not None else None
+
+    async def next_end(self):
+        return await self._events.get()
+
+    def _put_event(self, event):
+        if self._events.full():
+            self._events.get_nowait()
+        self._events.put_nowait(event)
+
+    async def _monitor(self, reader, writer, instance):
+        cancelled = False
+        try:
+            while raw := await reader.readline():
+                message = json.loads(raw)
+                if message.get("event") == "end-file":
+                    self._put_event(
+                        (
+                            (instance, message.get("playlist_entry_id")),
+                            message.get("reason"),
+                        )
+                    )
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
+        except (OSError, ValueError):
+            pass
+        finally:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except OSError:
+                pass
+            if not cancelled:
+                self._put_event(((instance, self._entry_id), "shutdown"))
 
     @property
     def running(self):
@@ -62,6 +104,11 @@ class MpvPlayback:
                     if not self.running:
                         raise PlaybackError("Не удалось запустить музыкальный плеер")
                     await asyncio.sleep(0.02)
+                reader, writer = await asyncio.open_unix_connection(self._socket)
+                self._instance += 1
+                self._monitor_task = asyncio.create_task(
+                    self._monitor(reader, writer, self._instance)
+                )
         except BaseException:
             await self.close()
             raise
@@ -130,6 +177,7 @@ class MpvPlayback:
             await self._request(["set_property", "pause", True])
             await self.set_volume(volume)
             await self._request(["loadfile", url, "replace"], wait_loaded=True)
+            self._entry_id = await self._request(["get_property", "playlist/0/id"])
             await self.set_paused(paused)
         except BaseException:
             # A timed-out load must not start playing later, after an error reply.
@@ -148,10 +196,18 @@ class MpvPlayback:
             await self._request(["set_property", "volume", value])
 
     async def stop(self):
+        self._entry_id = None
         if self.running:
             await self._request(["stop"])
 
     async def close(self):
+        monitor, self._monitor_task = self._monitor_task, None
+        if monitor is not None:
+            monitor.cancel()
+            await asyncio.gather(monitor, return_exceptions=True)
+        self._entry_id = None
+        while not self._events.empty():
+            self._events.get_nowait()
         process, self._process = self._process, None
         try:
             if process is not None and process.returncode is None:

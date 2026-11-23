@@ -50,6 +50,13 @@ implements weather/search requests. `music.py` implements optional Yandex Music 
 `music_playback.py` controls a private mpv process over a Unix socket in a mode-0700
 temporary directory. The agent receives bounded music actions, never arbitrary
 mpv commands or access to the IPC socket. Volume changes do not reload the track.
+A persistent IPC observer identifies natural EOF by playlist entry and player
+instance, so stale events and manual stops cannot advance another track. Queue
+resolution runs outside the control lock; stop/pause remain available while the
+provider responds. The queue does not repeat. Speech defaults to a short volume
+fade to a configurable fraction of the selected level, then restores the latest
+user level. Full speech pause remains available. Both policies preserve manual
+pause/stop and share a nested, cancellation-safe speech context.
 Tool results are data, not instructions. Network failures must not be reported
 as successful actions. The generated tool allowlist enables weather/search,
 session status and, only when configured, music.

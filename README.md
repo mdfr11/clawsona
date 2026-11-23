@@ -142,7 +142,10 @@ selection, language practice, performance tuning, timings and Linux autostart.
 | `PIPER_VOICE`, `PIPER_ENGLISH_VOICE` | Local RU/EN voices; run `setup --only tts` after changing them |
 | `FOLLOW_UP_WITHOUT_NAME=true` | Continue the conversation without repeating the name |
 | `LOG_TRANSCRIPTS=false` | Keep timings without logging recognized phrases |
-| `MUSIC_PAUSE_DURING_SPEECH=true` | Pause music for the entire spoken reply, then resume unless the user paused or stopped it |
+| `MUSIC_PAUSE_DURING_SPEECH=true` | Enable the music policy during spoken replies; `false` disables it |
+| `MUSIC_SPEECH_MODE=duck` | Smoothly lower music to 20% of the selected volume; `pause` suspends playback instead |
+| `MUSIC_DUCK_RATIO=0.2`, `MUSIC_FADE_DURATION_MS=200` | Relative speech volume and fade duration |
+| `MUSIC_AUTO_NEXT=true` | Advance on natural track end; stop when the queue finishes |
 
 ElevenLabs requires your API key and voice ID. Use `clawsona elevenlabs-voices`
 to list voices, and `clawsona voice-test` to hear your selection. Local Piper
@@ -153,8 +156,10 @@ client, an additional `music` extra, the local mpv player and a personal account
 Voice controls include louder/quieter, an exact volume, pause/resume, stop and
 next track. Search results or up to 50 liked tracks form a queue; `next` advances
 within it. Explicit short controls run locally after name/follow-up validation,
-without a model request. Free-form music requests use OpenClaw. Tracks do not
-advance automatically at the end. See the [music guide](docs/README.ru.md#яндекс-музыка-экспериментальная).
+without a model request. Free-form music requests use OpenClaw. Tracks advance
+automatically on natural completion. Manual stop and playback errors do not
+advance the queue. Speech ducking preserves manual pause/stop and restores the
+latest user-selected volume after the reply. See the [music guide](docs/README.ru.md#яндекс-музыка-экспериментальная).
 Legacy Deepgram/edge-tts support is available in the `cloud-speech` extra.
 
 ## Data and current limitations

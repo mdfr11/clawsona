@@ -42,7 +42,11 @@ async def test_load_waits_for_file_loaded_before_unpausing():
 
     async def handler(message, writer):
         commands.append(message["command"])
-        writer.write(b'{"request_id":1,"error":"success"}\n')
+        writer.write(
+            b'{"request_id":1,"error":"success","data":42}\n'
+            if message["command"] == ["get_property", "playlist/0/id"]
+            else b'{"request_id":1,"error":"success"}\n'
+        )
         await writer.drain()
         if message["command"][0] == "loadfile":
             load_seen.set()
@@ -61,6 +65,7 @@ async def test_load_waits_for_file_loaded_before_unpausing():
         await asyncio.wait_for(task, 2)
         assert commands[-1] == ["set_property", "pause", False]
         assert ["set_property", "volume", 65] in commands
+        assert playback.entry_id == (0, 42)
 
 
 @pytest.mark.asyncio
@@ -102,3 +107,35 @@ async def test_missing_mpv_reports_installation_instructions(mocker):
         await MpvPlayback().load(
             "https://music.yandex.net/test", volume=50, paused=False
         )
+
+
+@pytest.mark.asyncio
+async def test_monitor_pairs_end_events_with_player_instance_and_hides_details():
+    playback = MpvPlayback()
+    playback._entry_id = 42
+    reader = asyncio.StreamReader()
+    writer = MagicMock(wait_closed=AsyncMock())
+    reader.feed_data(
+        b'{"event":"file-loaded"}\n'
+        b'{"event":"end-file","playlist_entry_id":42,"reason":"eof",'
+        b'"filename":"private-signed-url"}\n'
+    )
+    reader.feed_eof()
+    await playback._monitor(reader, writer, 3)
+    assert await playback.next_end() == ((3, 42), "eof")
+    assert await playback.next_end() == ((3, 42), "shutdown")
+    writer.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_close_preserves_event_queue_for_a_waiting_observer():
+    playback = MpvPlayback()
+    pending = asyncio.create_task(playback.next_end())
+    try:
+        await asyncio.sleep(0)
+        await playback.close()
+        playback._put_event(((2, 1), "eof"))
+        assert await asyncio.wait_for(pending, 1) == ((2, 1), "eof")
+    finally:
+        pending.cancel()
+        await asyncio.gather(pending, return_exceptions=True)

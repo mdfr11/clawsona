@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     music_enabled: bool = False
     music_volume: int = Field(50, ge=0, le=100)
     music_pause_during_speech: bool = True
+    music_speech_mode: Literal["duck", "pause"] = "duck"
+    music_duck_ratio: float = Field(0.2, ge=0, le=1)
+    music_fade_duration_ms: int = Field(200, ge=0, le=2000)
+    music_auto_next: bool = True
     llm_timeout_s: float = Field(120, gt=0)
     llm_max_tokens: int = Field(384, ge=32, le=4096)
     max_history_turns: int = Field(12, ge=1, le=100)

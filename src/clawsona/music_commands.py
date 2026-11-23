@@ -137,7 +137,7 @@ def music_reply(command, result, *, english=False):
     track = result.get("track")
     if command.action == "stop":
         return "Music is off." if english else "Музыка выключена."
-    if not track:
+    if not track and not result.get("has_playback_context"):
         return (
             "No music is playing. Choose a track first."
             if english
