@@ -12,7 +12,7 @@
   <a href="https://github.com/mdfr11/clawsona">GitHub</a> ·
   <a href="#hear-the-voice">Hear the voices</a> ·
   <a href="docs/README.ru.md">Русская документация</a> ·
-  <a href="website/README.md">Project page</a> ·
+  <a href="https://mdfr11.github.io/clawsona/">Project page</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>
 
@@ -40,7 +40,7 @@ Real ElevenLabs samples synthesized from public demo text:
 | Russian | ElevenLabs / Roger | [▶ «Привет! Я Мира. Давай поговорим.»](website/media/hello-ru.mp3) |
 | English | ElevenLabs / Roger | [▶ “Hello! I'm Mira. What would you like to do today?”](website/media/hello-en.mp3) |
 
-The [project page](website/README.md) includes an audio player and interactive
+The [project page](https://mdfr11.github.io/clawsona/) includes an audio player and interactive
 conversation examples. Samples are not a live microphone-to-model demo. See
 [media provenance](website/media/README.md) or the [live recording outline](docs/DEMO.md).
 The samples use optional paid ElevenLabs TTS. Local bilingual Piper is the

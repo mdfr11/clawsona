@@ -45,7 +45,7 @@ clawsona = "clawsona.main:main"
 lyutik = "clawsona.main:main"
 
 [project.urls]
-Homepage = "https://github.com/mdfr11/clawsona"
+Homepage = "https://mdfr11.github.io/clawsona/"
 Repository = "https://github.com/mdfr11/clawsona"
 Documentation = "https://github.com/mdfr11/clawsona#quick-start"
 Issues = "https://github.com/mdfr11/clawsona/issues"

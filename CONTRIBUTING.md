@@ -22,6 +22,9 @@ uv run python scripts/check_distribution.py dist
 Node.js is used for the plugin syntax check. Use the Node.js version required
 by your OpenClaw release for live integration tests. Automated tests do not
 require OpenClaw, microphones, downloaded models or paid service credentials.
+The test setup replaces `sounddevice` before collection, so PortAudio does not
+initialize or try to contact PulseAudio. Each audio test must explicitly mock
+device operations; an unexpected attempt to use audio fails the test.
 After testing optional integrations, `uv sync --frozen` restores the base setup.
 
 ## Making changes
