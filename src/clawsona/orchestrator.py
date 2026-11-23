@@ -151,6 +151,16 @@ class Orchestrator:
             logger.info("Распознано обращение по имени")
             transcript = addressed or self._config.wake_word
         control = parse_music_command(transcript) if self._music is not None else None
+        if control is not None and not (
+            self._music.has_playback_context
+            or re.search(
+                r"\b(?:музык\w*|трек\w*|песн\w*|music|song|track)\b",
+                transcript.casefold(),
+            )
+        ):
+            # An enabled integration alone must not turn a lesson's "continue"
+            # or "next" into a music action when no track has been selected.
+            control = None
         if control is not None:
             await self._control_music(control, transcript)
             turn.result = "music_control"

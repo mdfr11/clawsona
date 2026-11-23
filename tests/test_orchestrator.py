@@ -104,6 +104,17 @@ async def test_local_music_controls_still_require_activation():
 
 
 @pytest.mark.asyncio
+async def test_continue_without_a_music_context_stays_in_the_conversation():
+    orch = make_orchestrator()
+    orch._music = MagicMock(has_playback_context=False, command=AsyncMock())
+    orch._listen_and_transcribe = AsyncMock(return_value="Лютик, продолжить")
+    orch._think_and_speak = AsyncMock()
+    await orch._handle_turn(False, 0, False, MagicMock())
+    orch._music.command.assert_not_awaited()
+    orch._think_and_speak.assert_awaited_once_with("продолжить")
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("fail", [False, True])
 async def test_music_pause_spans_all_sentences_and_is_released_on_tts_failure(fail):
     orch = make_orchestrator()

@@ -31,6 +31,10 @@ class YandexMusicPlayer:
         self._lock = asyncio.Lock()
         self._playback = MpvPlayback()
 
+    @property
+    def has_playback_context(self):
+        return self._track is not None
+
     def _authenticated_client(self):
         from clawsona.yandex_auth import saved_token
 
