@@ -34,7 +34,7 @@ def setup_logging(level="INFO", log_file=None) -> None:
     logging.getLogger("httpx2").setLevel(logging.WARNING)
 
 
-async def async_main(config: Settings | None = None) -> None:
+async def async_main(config: Settings | None = None, *, music=None) -> None:
     from clawsona.audio_io import AudioCapture
     from clawsona.local_speech import create_stt, create_tts
     from clawsona.orchestrator import Orchestrator
@@ -60,7 +60,7 @@ async def async_main(config: Settings | None = None) -> None:
             config.vad_min_speech_ms,
             config.vad_threshold,
         )
-    orch = Orchestrator(config, audio, wakeword, vad, stt, chat, tts)
+    orch = Orchestrator(config, audio, wakeword, vad, stt, chat, tts, music=music)
     logger.info(
         "STT=%s, TTS=%s, LLM=%s/%s",
         config.stt_provider,
@@ -225,8 +225,8 @@ async def dispatch(args) -> int:
             from clawsona.openclaw_setup import ensure_gateway
             from clawsona.tool_server import serve_tools
 
-            async with serve_tools(config), ensure_gateway(config):
-                await async_main(config)
+            async with serve_tools(config) as music, ensure_gateway(config):
+                await async_main(config, music=music)
         else:
             await async_main(config)
     return 0

@@ -5,7 +5,35 @@ import pytest
 from aiohttp.test_utils import TestServer
 
 from clawsona.config import Settings
-from clawsona.tool_server import create_tool_app
+from clawsona.tool_server import create_tool_app, serve_tools
+
+
+@pytest.mark.asyncio
+async def test_voice_and_http_tools_share_the_same_music_player(
+    mocker, unused_tcp_port
+):
+    config = Settings(
+        _env_file=None,
+        music_enabled=True,
+        clawsona_tools_token="test",
+        clawsona_tools_port=unused_tcp_port,
+    )
+    player = MagicMock(
+        command=AsyncMock(return_value={"status": "paused"}), close=AsyncMock()
+    )
+    mocker.patch("clawsona.tool_server.YandexMusicPlayer", return_value=player)
+    async with serve_tools(config) as shared:
+        assert shared is player
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"http://127.0.0.1:{unused_tcp_port}/music",
+                headers={"Authorization": "Bearer test"},
+                json={"action": "pause"},
+            ) as response:
+                assert response.status == 200
+                assert (await response.json())["status"] == "paused"
+        player.command.assert_awaited_once_with("pause", "")
+    player.close.assert_awaited_once()
 
 
 @pytest.mark.asyncio

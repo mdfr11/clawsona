@@ -142,6 +142,7 @@ selection, language practice, performance tuning, timings and Linux autostart.
 | `PIPER_VOICE`, `PIPER_ENGLISH_VOICE` | Local RU/EN voices; run `setup --only tts` after changing them |
 | `FOLLOW_UP_WITHOUT_NAME=true` | Continue the conversation without repeating the name |
 | `LOG_TRANSCRIPTS=false` | Keep timings without logging recognized phrases |
+| `MUSIC_PAUSE_DURING_SPEECH=true` | Pause music for the entire spoken reply, then resume unless the user paused or stopped it |
 
 ElevenLabs requires your API key and voice ID. Use `clawsona elevenlabs-voices`
 to list voices, and `clawsona voice-test` to hear your selection. Local Piper

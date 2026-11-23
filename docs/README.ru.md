@@ -164,8 +164,28 @@ uv run clawsona doctor --check-llm --check-speech
 
 По умолчанию `MUSIC_ENABLED=false`, агент не получает
 музыкальный инструмент и не обращается к Яндексу. Для подключения:
-`uv sync --extra music`, `MUSIC_ENABLED=true`, затем `clawsona yandex-login`
-и повторная подготовка `clawsona openclaw-setup`.
+
+```bash
+uv run --extra music clawsona yandex-login
+```
+
+Подтвердите вход по адресу и коду из терминала. Затем укажите
+`MUSIC_ENABLED=true` в `.env` и выполните:
+
+```bash
+uv run --extra music clawsona openclaw-setup
+uv run --extra music clawsona
+```
+
+Сохраняйте `--extra music` при каждом запуске через uv, чтобы музыкальная
+зависимость оставалась установленной. После изменения настроек перезапустите
+приложение и отдельно запущенный шлюз OpenClaw.
+
+`MUSIC_PAUSE_DURING_SPEECH=true` автоматически ставит музыку на паузу перед
+озвучкой и продолжает её после полного ответа, включая ответы из нескольких
+фраз. После ошибки или отмены озвучки автопауза снимается. Явная пользовательская
+пауза или остановка сохраняется: бот сам не возобновит такой трек.
+Чтобы отключить это поведение, задайте `MUSIC_PAUSE_DURING_SPEECH=false`.
 
 
 Используется [неофициальный клиент yandex-music](https://github.com/MarshalX/yandex-music-api),

@@ -1,10 +1,14 @@
 """Personal Yandex Music playback; credentials never enter the agent context."""
 
 import asyncio
+import logging
 import os
 import shutil
 import signal
+from contextlib import asynccontextmanager
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 
 class YandexMusicPlayer:
@@ -18,6 +22,8 @@ class YandexMusicPlayer:
         self._process = None
         self._track = None
         self._paused = False
+        self._process_paused = False
+        self._speech_depth = 0
         self._lock = asyncio.Lock()
 
     def _find_track(self, query):
@@ -100,27 +106,60 @@ class YandexMusicPlayer:
                 if self._process.returncode is not None:
                     raise RuntimeError("Плеер не смог открыть музыкальный поток")
                 self._track, self._paused = track, False
+                self._sync_pause()
             elif action == "stop":
                 await self._stop()
             elif action in {"pause", "resume"}:
                 if self._process is None or self._process.returncode is not None:
                     return {"status": "stopped", "message": "Музыка сейчас не играет"}
-                sig = signal.SIGSTOP if action == "pause" else signal.SIGCONT
-                self._process.send_signal(sig)
                 self._paused = action == "pause"
+                self._sync_pause()
             elif action != "status":
                 raise ValueError("Неизвестная команда плеера")
             playing = self._process is not None and self._process.returncode is None
             return {
-                "status": ("paused" if self._paused else "playing")
+                "status": (
+                    "paused" if self._paused or self._speech_depth else "playing"
+                )
                 if playing
                 else "stopped",
                 "track": self._track if playing else None,
+                "paused_for_speech": bool(playing and self._speech_depth),
             }
+
+    def _sync_pause(self):
+        process = self._process
+        if process is None or process.returncode is not None:
+            return
+        paused = self._paused or self._speech_depth > 0
+        if paused != self._process_paused:
+            try:
+                process.send_signal(signal.SIGSTOP if paused else signal.SIGCONT)
+            except ProcessLookupError:
+                return
+            self._process_paused = paused
+
+    @asynccontextmanager
+    async def pause_for_speech(self):
+        async with self._lock:
+            self._speech_depth += 1
+            self._sync_pause()
+            active = self._process is not None and self._process.returncode is None
+            if active and self._speech_depth == 1:
+                logger.info("Музыка на паузе на время озвучки")
+        try:
+            yield
+        finally:
+            async with self._lock:
+                self._speech_depth -= 1
+                self._sync_pause()
+                if active and not self._speech_depth and not self._paused:
+                    logger.info("Озвучка завершена; автопауза музыки снята")
 
     async def _stop(self):
         process, self._process = self._process, None
         self._paused, self._track = False, None
+        self._process_paused = False
         if process is not None and process.returncode is None:
             try:
                 if os.name == "posix":

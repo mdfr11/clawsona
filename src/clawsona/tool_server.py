@@ -84,11 +84,12 @@ async def serve_tools(config):
         raise ValueError(
             "Выполните clawsona openclaw-setup для настройки локальных инструментов"
         )
-    runner = web.AppRunner(create_tool_app(config), access_log=None)
+    player = YandexMusicPlayer(config) if config.music_enabled else None
+    runner = web.AppRunner(create_tool_app(config, player), access_log=None)
     try:
         with stage_timer("startup_tools"):
             await runner.setup()
             await web.TCPSite(runner, "127.0.0.1", config.clawsona_tools_port).start()
-        yield
+        yield player
     finally:
         await runner.cleanup()

@@ -4,7 +4,7 @@ import logging
 import re
 import time
 from collections import deque
-from contextlib import AsyncExitStack, aclosing
+from contextlib import AsyncExitStack, aclosing, nullcontext
 
 import numpy as np
 
@@ -42,7 +42,7 @@ class State(enum.Enum):
 
 
 class Orchestrator:
-    def __init__(self, config, audio, wakeword, vad, stt, chat, tts):
+    def __init__(self, config, audio, wakeword, vad, stt, chat, tts, *, music=None):
         self._config = config
         self._audio = audio
         self._wakeword = wakeword
@@ -50,6 +50,7 @@ class Orchestrator:
         self._stt = stt
         self._chat = chat
         self._tts = tts
+        self._music = music
         self._state = State.IDLE
         self._conversation_history: list[dict] = []
 
@@ -173,10 +174,16 @@ class Orchestrator:
         )
 
     async def _speak(self, text):
-        with stage_timer(
-            "tts_total", provider=self._config.tts_provider, chars=len(text)
-        ):
-            await self._tts.speak(text)
+        async with self._pause_music():
+            with stage_timer(
+                "tts_total", provider=self._config.tts_provider, chars=len(text)
+            ):
+                await self._tts.speak(text)
+
+    def _pause_music(self):
+        if self._music is not None and self._config.music_pause_during_speech:
+            return self._music.pause_for_speech()
+        return nullcontext()
 
     async def _listen_and_transcribe(
         self, timeout_s: float | None = None
@@ -385,9 +392,14 @@ class Orchestrator:
             await sentences.put(None)
 
         async def consume():
-            while (sentence := await sentences.get()) is not None:
-                self._transition(State.SPEAKING)
-                await self._speak(sentence)
+            async with AsyncExitStack() as speech:
+                started = False
+                while (sentence := await sentences.get()) is not None:
+                    if not started:
+                        await speech.enter_async_context(self._pause_music())
+                        started = True
+                    self._transition(State.SPEAKING)
+                    await self._speak(sentence)
             self._transition(State.THINKING)
 
         with stage_timer("reply_total"):

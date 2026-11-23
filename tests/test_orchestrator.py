@@ -43,6 +43,44 @@ def make_orchestrator(**overrides):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("fail", [False, True])
+async def test_music_pause_spans_all_sentences_and_is_released_on_tts_failure(fail):
+    orch = make_orchestrator()
+    events = []
+    depth = 0
+
+    @asynccontextmanager
+    async def pause():
+        nonlocal depth
+        if depth == 0:
+            events.append("pause")
+        depth += 1
+        try:
+            yield
+        finally:
+            depth -= 1
+            if depth == 0:
+                events.append("resume")
+
+    orch._music = MagicMock(pause_for_speech=pause)
+
+    async def speak(text):
+        assert depth > 0
+        if fail:
+            raise RuntimeError("TTS unavailable")
+
+    orch._tts.speak = AsyncMock(side_effect=speak)
+    if fail:
+        with pytest.raises(ExceptionGroup):
+            await orch._think_and_speak("вопрос")
+    else:
+        await orch._think_and_speak("вопрос")
+        assert orch._tts.speak.await_count == 2
+    assert events == ["pause", "resume"]
+    assert depth == 0
+
+
+@pytest.mark.asyncio
 async def test_transcribes_utterance_and_stops_recording():
     orch = make_orchestrator()
     orch._vad.process_chunk.side_effect = [None, "speech_start", None, "speech_end"]

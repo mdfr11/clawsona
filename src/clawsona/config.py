@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     yandex_music_token: str = Field("", repr=False)
     music_enabled: bool = False
     music_volume: int = Field(50, ge=0, le=100)
+    music_pause_during_speech: bool = True
     llm_timeout_s: float = Field(120, gt=0)
     llm_max_tokens: int = Field(384, ge=32, le=4096)
     max_history_turns: int = Field(12, ge=1, le=100)
