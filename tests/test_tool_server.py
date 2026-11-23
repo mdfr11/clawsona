@@ -88,3 +88,20 @@ async def test_music_commands_reach_player_without_shell(mocker, caplog):
     assert event["operation"] == "music"
     assert event["status"] == "ok"
     assert event["tool_call"]
+
+
+@pytest.mark.asyncio
+async def test_volume_options_are_forwarded_to_the_music_player():
+    config = Settings(_env_file=None, clawsona_tools_token="test", music_enabled=True)
+    player = MagicMock(
+        command=AsyncMock(return_value={"volume": 75}), close=AsyncMock()
+    )
+    async with TestServer(create_tool_app(config, player)) as server:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                server.make_url("/music"),
+                headers={"Authorization": "Bearer test"},
+                json={"action": "set_volume", "volume": 75},
+            ) as response:
+                assert response.status == 200
+    player.command.assert_awaited_once_with("set_volume", "", volume=75)

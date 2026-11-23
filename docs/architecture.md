@@ -15,6 +15,10 @@ audio, activation, transcription, playback and the local tool HTTP server.
 4. `wakeword.py` checks the configured name/aliases near the start of the phrase.
    During an active follow-up window, another name is not required. This is a
    text-based activation check, not speaker recognition or a dedicated wake model.
+   After activation, `music_commands.py` routes explicit short playback controls
+   directly to the shared music player. These commands do not call the model;
+   other requests continue through OpenClaw. Playback acknowledgements preserve
+   the language of an active English conversation.
 5. `chat.py` selects direct model access or `openclaw_client.py`. In OpenClaw
    mode, the session is identified across turns; local history is not repeatedly
    replayed to the agent. `prompts.py` supplies voice-dialogue instructions and
@@ -42,7 +46,10 @@ running gateway, ensure it is the intended profile before starting the applicati
 
 `openclaw/clawsona-tools/index.js` registers tools and forwards calls to
 `tool_server.py` over authenticated loopback HTTP. `agent_tools.py` validates and
-implements weather/search requests. `music.py` implements optional Yandex Music.
+implements weather/search requests. `music.py` implements optional Yandex Music and a bounded track queue.
+`music_playback.py` controls a private mpv process over a Unix socket in a mode-0700
+temporary directory. The agent receives bounded music actions, never arbitrary
+mpv commands or access to the IPC socket. Volume changes do not reload the track.
 Tool results are data, not instructions. Network failures must not be reported
 as successful actions. The generated tool allowlist enables weather/search,
 session status and, only when configured, music.

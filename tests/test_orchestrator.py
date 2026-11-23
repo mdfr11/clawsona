@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from clawsona.config import Settings
+from clawsona.music_commands import MusicCommand
 from clawsona.orchestrator import Orchestrator
 from clawsona.prompts import VOICE_INPUT_INSTRUCTIONS
 from clawsona.vad import CHUNK_SIZE, VADDetector
@@ -40,6 +41,66 @@ def make_orchestrator(**overrides):
     chat.chat_stream = stream
     tts = MagicMock(speak=AsyncMock())
     return Orchestrator(config, audio, wake, vad, stt, chat, tts)
+
+
+@pytest.mark.asyncio
+async def test_music_stop_is_executed_locally_without_a_model_call():
+    orch = make_orchestrator()
+    orch._listen_and_transcribe = AsyncMock(return_value="Лютик, стоп")
+    orch._think_and_speak = AsyncMock()
+    events = []
+
+    @asynccontextmanager
+    async def pause():
+        events.append("pause")
+        try:
+            yield
+        finally:
+            events.append("resume")
+
+    orch._music = MagicMock(
+        pause_for_speech=pause,
+        command=AsyncMock(
+            return_value={"status": "paused", "track": {"title": "test"}}
+        ),
+    )
+    turn = MagicMock()
+    deadline = await orch._handle_turn(False, 0, False, turn)
+    orch._music.command.assert_awaited_once_with("pause")
+    orch._think_and_speak.assert_not_awaited()
+    orch._tts.speak.assert_awaited_once_with("Музыка на паузе.")
+    assert turn.result == "music_control"
+    assert deadline > asyncio.get_running_loop().time()
+    assert events[0] == "pause" and events[-1] == "resume"
+
+
+@pytest.mark.asyncio
+async def test_local_music_ack_keeps_the_language_of_english_practice():
+    orch = make_orchestrator()
+    orch._conversation_history = [
+        {"role": "assistant", "content": "Let's keep practicing English."}
+    ]
+    orch._music = MagicMock(command=AsyncMock(return_value={"volume": 40}))
+    orch._music.pause_for_speech = _empty_context
+    await orch._control_music(MusicCommand("volume_down"), "тише")
+    orch._tts.speak.assert_awaited_once_with("Music volume is 40 percent.")
+
+
+@asynccontextmanager
+async def _empty_context():
+    yield
+
+
+@pytest.mark.asyncio
+async def test_local_music_controls_still_require_activation():
+    orch = make_orchestrator()
+    orch._listen_and_transcribe = AsyncMock(return_value="громче")
+    orch._music = MagicMock(command=AsyncMock())
+    turn = MagicMock()
+    await orch._handle_turn(False, 0, False, turn)
+    orch._music.command.assert_not_awaited()
+    orch._tts.speak.assert_not_awaited()
+    assert turn.result == "not_addressed"
 
 
 @pytest.mark.asyncio

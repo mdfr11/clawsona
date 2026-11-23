@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import io
+import shutil
 import time
 import wave
 
@@ -71,10 +72,29 @@ async def doctor(config, check_llm=False, check_audio=True, check_speech=False) 
                     lambda p=path: check_file(p.with_suffix(".onnx.json")),
                 )
     else:
-        import shutil
-
         report("edge-tts", lambda: importlib.import_module("edge_tts") and None)
         report("FFmpeg", lambda: require(shutil.which("ffmpeg"), "Установите ffmpeg"))
+    if config.music_enabled:
+        from clawsona.yandex_auth import saved_token
+
+        report(
+            "Яндекс Музыка SDK",
+            lambda: importlib.import_module("yandex_music") and None,
+        )
+        report(
+            "Музыкальный плеер mpv",
+            lambda: require(
+                shutil.which("mpv"),
+                "Установите mpv: brew install mpv или sudo apt install mpv",
+            ),
+        )
+        report(
+            "Авторизация Яндекс Музыки",
+            lambda: require(
+                config.yandex_music_token or saved_token(),
+                "Выполните uv run --extra music clawsona yandex-login",
+            ),
+        )
     report("Имя ассистента", lambda: config.assistant_name)
     report("Варианты обращения", lambda: ", ".join(config.assistant_aliases) or "нет")
     if check_audio:

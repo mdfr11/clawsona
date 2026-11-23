@@ -1,3 +1,4 @@
+import asyncio
 import secrets
 import uuid
 from contextlib import asynccontextmanager
@@ -61,9 +62,16 @@ def create_tool_app(config, music=None):
         elif operation == "music":
             if not config.music_enabled or player is None:
                 raise ValueError("Музыка отключена в этой установке")
-            result = await player.command(
-                data.get("action", "status"), data.get("query", "")
-            )
+            options = {key: data[key] for key in ("volume", "step") if key in data}
+            try:
+                async with asyncio.timeout(40):
+                    result = await player.command(
+                        data.get("action", "status"), data.get("query", ""), **options
+                    )
+            except TimeoutError as exc:
+                raise ValueError(
+                    "Музыкальная команда не завершилась вовремя. Попробуйте ещё раз."
+                ) from exc
         else:
             raise web.HTTPNotFound()
         return web.json_response(result)

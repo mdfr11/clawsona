@@ -8,6 +8,7 @@ from contextlib import AsyncExitStack, aclosing, nullcontext
 
 import numpy as np
 
+from clawsona.music_commands import music_reply, parse_music_command
 from clawsona.prompts import VOICE_INPUT_INSTRUCTIONS, build_system_prompt
 from clawsona.timing import (
     log_dialogue,
@@ -149,6 +150,15 @@ class Orchestrator:
             self._transition(State.WAKE)
             logger.info("Распознано обращение по имени")
             transcript = addressed or self._config.wake_word
+        control = parse_music_command(transcript) if self._music is not None else None
+        if control is not None:
+            await self._control_music(control, transcript)
+            turn.result = "music_control"
+            return (
+                loop.time() + self._config.conversation_timeout_s
+                if self._config.follow_up_without_name
+                else 0.0
+            )
         command = self.command(transcript)
         if self._config.llm_provider == "openclaw" and transcript.lower().strip(
             " .!?"
@@ -179,6 +189,41 @@ class Orchestrator:
                 "tts_total", provider=self._config.tts_provider, chars=len(text)
             ):
                 await self._tts.speak(text)
+
+    async def _control_music(self, command, transcript):
+        from clawsona.music import MusicControlError
+        from clawsona.music_playback import PlaybackError
+
+        english = bool(re.search(r"[a-zA-Z]", transcript))
+        previous_reply = next(
+            (
+                message["content"]
+                for message in reversed(self._conversation_history)
+                if message["role"] == "assistant"
+            ),
+            "",
+        )
+        if re.search(r"[a-zA-Z]", previous_reply) and not re.search(
+            r"[а-яА-ЯёЁ]", previous_reply
+        ):
+            english = True
+        async with self._pause_music():
+            try:
+                with stage_timer("music_control", action=command.action):
+                    async with asyncio.timeout(40):
+                        result = await self._music.command(
+                            command.action, **command.options()
+                        )
+                reply = music_reply(command, result, english=english)
+            except (MusicControlError, PlaybackError, TimeoutError) as exc:
+                if english:
+                    reply = "I couldn't complete the music command. Please try again."
+                else:
+                    reply = (
+                        str(exc)
+                        or "Музыкальная команда не завершилась вовремя. Попробуй ещё раз."
+                    )
+            await self._speak(reply)
 
     def _pause_music(self):
         if self._music is not None and self._config.music_pause_during_speech:

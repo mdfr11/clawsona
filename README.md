@@ -149,8 +149,12 @@ to list voices, and `clawsona voice-test` to hear your selection. Local Piper
 fallback is optional. API usage is billed by the provider.
 
 Yandex Music is experimental and disabled by default. It uses an unofficial
-client, an additional `music` extra, FFmpeg and a personal account/subscription.
-It has not been validated end to end. See the [music guide](docs/README.ru.md#яндекс-музыка-экспериментальная).
+client, an additional `music` extra, the local mpv player and a personal account/subscription.
+Voice controls include louder/quieter, an exact volume, pause/resume, stop and
+next track. Search results or up to 50 liked tracks form a queue; `next` advances
+within it. Explicit short controls run locally after name/follow-up validation,
+without a model request. Free-form music requests use OpenClaw. Tracks do not
+advance automatically at the end. See the [music guide](docs/README.ru.md#яндекс-музыка-экспериментальная).
 Legacy Deepgram/edge-tts support is available in the `cloud-speech` extra.
 
 ## Data and current limitations

@@ -22,6 +22,13 @@ packages include their own metadata and license files. Optional integrations
 and transitive/native libraries also retain their licenses. Include the relevant
 notices and comply with their terms when redistributing a complete installation.
 
+## Optional music playback
+
+Music playback uses the separately installed [mpv player](https://mpv.io),
+with its own [license and build notices](https://github.com/mpv-player/mpv/blob/master/Copyright).
+It is not bundled with the Python wheel. The Python client controls only its own
+local mpv process; no additional music-control cloud service is used.
+
 ## Piper voices
 
 Do not infer a voice model's terms solely from the repository's top-level
