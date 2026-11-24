@@ -43,7 +43,13 @@ def parse_music_command(text: str) -> MusicCommand | None:
     text = re.sub(r"(?<=[a-zа-я])-(?=[a-zа-я])", " ", text)
     text = re.sub(r"[^\w\s%\-]", " ", text).strip()
     text = re.sub(r"\s+", " ", text)
-    text = re.sub(r"^(?:пожалуйста|please) | (?:пожалуйста|please)$", "", text).strip()
+    for _ in range(2):
+        text = re.sub(
+            r"^(?:(?:ну )?дава(?:й(?: ка)?|йте)|пожалуйста|please|can you|could you) ",
+            "",
+            text,
+        )
+        text = re.sub(r" (?:пожалуйста|please)$", "", text).strip()
     simple = {
         "pause": {
             "стоп",
@@ -78,6 +84,8 @@ def parse_music_command(text: str) -> MusicCommand | None:
             "следующая песня",
             "переключи трек",
             "переключи на следующий трек",
+            "включи следующий трек",
+            "поставь следующий трек",
             "next",
             "next track",
             "next song",

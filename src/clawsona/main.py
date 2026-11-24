@@ -96,6 +96,15 @@ async def async_main(config: Settings | None = None, *, music=None) -> None:
             if config.barge_in_mode == "name"
             else "любой фразой (для наушников)",
         )
+    if config.music_enabled:
+        logger.info(
+            "Во время музыки: %s",
+            {
+                "commands": "без имени только короткие команды; разговор по имени",
+                "name": "все обращения по имени",
+                "all": "свободный диалог без имени",
+            }[config.music_follow_up],
+        )
     print(
         f"{config.assistant_name}: можно говорить. {activation}. Для выхода — Ctrl+C.",
         flush=True,

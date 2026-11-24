@@ -1,5 +1,6 @@
 import asyncio
 import threading
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
@@ -49,6 +50,41 @@ def test_signed_url_from_unexpected_host_is_not_played(mocker):
         player._find_track("test")
 
 
+def test_artist_queue_uses_exact_artist_id_and_removes_duplicate_tracks(mocker):
+    mocker.patch("clawsona.yandex_auth.saved_token", return_value="")
+    player = YandexMusicPlayer(Settings(_env_file=None))
+    client = mocker.patch.object(player, "_authenticated_client").return_value
+    artist = MagicMock(id=10)
+    artist.name = "Группа Тест"
+    other = MagicMock(id=11)
+    other.name = "Группа Тест Каверы"
+    first = SimpleNamespace(id=1, artists=[artist])
+    second = SimpleNamespace(id=2, artists=[artist, other])
+    cover = SimpleNamespace(id=3, artists=[other])
+    artist.get_tracks.return_value.tracks = [first, first, cover, second]
+    client.search.return_value.artists.results = [other, artist]
+    choose = mocker.patch.object(
+        player, "_select_track", return_value=(0, {}, "fixture")
+    )
+    prepared, name = player._prepare_artist("группа тест")
+    assert name == "Группа Тест"
+    assert prepared[0] == [first, second]
+    artist.get_tracks.assert_called_once_with(page=0, page_size=50)
+    choose.assert_called_once_with([first, second], 0)
+
+
+def test_artist_search_does_not_substitute_a_different_performer(mocker):
+    mocker.patch("clawsona.yandex_auth.saved_token", return_value="")
+    player = YandexMusicPlayer(Settings(_env_file=None))
+    client = mocker.patch.object(player, "_authenticated_client").return_value
+    artist = MagicMock()
+    artist.name = "Похожее название"
+    client.search.return_value.artists.results = [artist]
+    with pytest.raises(ValueError, match="Уточните"):
+        player._prepare_artist("Другое название")
+    artist.get_tracks.assert_not_called()
+
+
 def playing_player(mocker, *, mode="pause", auto=False):
     mocker.patch("clawsona.yandex_auth.saved_token", return_value="")
     player = YandexMusicPlayer(
@@ -71,6 +107,31 @@ def playing_player(mocker, *, mode="pause", auto=False):
     player._playback = playback
     player._track = {"title": "test", "id": "1"}
     return player, playback
+
+
+@pytest.mark.asyncio
+async def test_audibility_tracks_pause_volume_stop_and_process_exit_without_network(
+    mocker,
+):
+    player, playback = playing_player(mocker)
+    playback.running = True
+    assert player.is_audible
+    await player.command("pause")
+    assert not player.is_audible
+    await player.command("resume")
+    assert player.is_audible
+    async with player.pause_for_speech():
+        assert not player.is_audible
+    assert player.is_audible
+    await player.command("set_volume", volume=0)
+    assert not player.is_audible
+    await player.command("set_volume", volume=50)
+    assert player.is_audible
+    playback.running = False
+    assert not player.is_audible
+    playback.running = True
+    await player.command("stop")
+    assert not player.is_audible
 
 
 @pytest.mark.asyncio
@@ -148,6 +209,23 @@ async def test_track_started_during_speech_stays_paused(mocker):
         await player.command("play", "test")
         playback.load.assert_awaited_once_with(prepared[-1], volume=50, paused=True)
     playback.set_paused.assert_awaited_with(False)
+
+
+@pytest.mark.asyncio
+async def test_artist_queue_source_survives_manual_next(mocker):
+    player, playback = playing_player(mocker)
+    first = {"title": "First", "artist": "Artist", "id": "1"}
+    second = {"title": "Second", "artist": "Artist", "id": "2"}
+    queue = [object(), object()]
+    mocker.patch.object(
+        player, "_prepare_artist", return_value=((queue, 0, first, "fixture"), "Artist")
+    )
+    result = await player.command("play_artist", "Artist")
+    assert result["queue_kind"] == "artist" and result["queue_artist"] == "Artist"
+    mocker.patch.object(player, "_select_track", return_value=(1, second, "fixture2"))
+    result = await player.command("next")
+    assert result["queue_kind"] == "artist" and result["queue_artist"] == "Artist"
+    assert result["track"]["id"] == "2"
 
 
 @pytest.mark.asyncio

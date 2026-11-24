@@ -105,3 +105,20 @@ async def test_volume_options_are_forwarded_to_the_music_player():
             ) as response:
                 assert response.status == 200
     player.command.assert_awaited_once_with("set_volume", "", volume=75)
+
+
+@pytest.mark.asyncio
+async def test_artist_playback_reaches_shared_player():
+    config = Settings(_env_file=None, clawsona_tools_token="test", music_enabled=True)
+    player = MagicMock(
+        command=AsyncMock(return_value={"queue_kind": "artist"}), close=AsyncMock()
+    )
+    async with TestServer(create_tool_app(config, player)) as server:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                server.make_url("/music"),
+                headers={"Authorization": "Bearer test"},
+                json={"action": "play_artist", "query": "Artist"},
+            ) as response:
+                assert response.status == 200
+    player.command.assert_awaited_once_with("play_artist", "Artist")

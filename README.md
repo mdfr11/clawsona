@@ -148,6 +148,7 @@ selection, language practice, performance tuning, timings and Linux autostart.
 | `MUSIC_SPEECH_MODE=duck` | Smoothly lower music to 20% of the selected volume; `pause` suspends playback instead |
 | `MUSIC_DUCK_RATIO=0.2`, `MUSIC_FADE_DURATION_MS=200` | Relative speech volume and fade duration |
 | `MUSIC_AUTO_NEXT=true` | Advance on natural track end; stop when the queue finishes |
+| `MUSIC_FOLLOW_UP=commands` | During music, accept only short controls without a name; conversation requires the name |
 
 ElevenLabs requires your API key and voice ID. Use `clawsona elevenlabs-voices`
 to list voices, and `clawsona voice-test` to hear your selection. Local Piper
@@ -156,9 +157,16 @@ fallback is optional. API usage is billed by the provider.
 Yandex Music is experimental and disabled by default. It uses an unofficial
 client, an additional `music` extra, the local mpv player and a personal account/subscription.
 Voice controls include louder/quieter, an exact volume, pause/resume, stop and
-next track. Search results or up to 50 liked tracks form a queue; `next` advances
-within it. Explicit short controls run locally after name/follow-up validation,
-without a model request. Free-form music requests use OpenClaw. Tracks advance
+next track. Artist requests use an artist catalog queue, matched by artist ID,
+with up to 50 distinct tracks. Specific-song searches can include covers by
+different performers; liked tracks also form a queue. `next` advances within it.
+Explicit short controls, including “Давай следующий трек”, run locally after
+name/follow-up validation, without a model request. During audible music,
+`MUSIC_FOLLOW_UP=commands` accepts these controls even after the conversation timeout but
+requires the configured name for other speech. Paused, muted and stopped music
+allow normal follow-ups again. `name` requires the name for everything during
+music; `all` allows unrestricted follow-ups. Lyrics resembling an exact command
+can still trigger it in `commands` mode. Free-form requests use OpenClaw. Tracks advance
 automatically on natural completion. Manual stop and playback errors do not
 advance the queue. Speech ducking preserves manual pause/stop and restores the
 latest user-selected volume after the reply. See the [music guide](docs/README.ru.md#яндекс-музыка-экспериментальная).

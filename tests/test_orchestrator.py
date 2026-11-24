@@ -238,12 +238,78 @@ async def _empty_context():
 async def test_local_music_controls_still_require_activation():
     orch = make_orchestrator()
     orch._listen_and_transcribe = AsyncMock(return_value="громче")
-    orch._music = MagicMock(command=AsyncMock())
+    orch._music = MagicMock(is_audible=False, command=AsyncMock())
     turn = MagicMock()
     await orch._handle_turn(False, 0, False, turn)
     orch._music.command.assert_not_awaited()
     orch._tts.speak.assert_not_awaited()
     assert turn.result == "not_addressed"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "mode,audible,active,phrase,expected",
+    [
+        ("commands", True, True, "Вечером мы идём домой", "ignore"),
+        ("commands", True, True, "Давай следующий трек.", "control"),
+        ("commands", True, True, "Мира, объясни дроби", "model"),
+        ("commands", True, False, "Следующий трек", "control"),
+        ("name", True, False, "Следующий трек", "ignore"),
+        ("name", True, True, "Давай следующий трек", "ignore"),
+        ("name", True, True, "Мира, давай следующий трек", "control"),
+        ("all", True, True, "Объясни дроби", "model"),
+        ("commands", False, True, "Объясни дроби", "model"),
+    ],
+)
+async def test_music_follow_up_policy(mode, audible, active, phrase, expected, caplog):
+    orch = make_orchestrator(music_follow_up=mode, log_transcripts=True)
+    orch._music = MagicMock(is_audible=audible, has_playback_context=True)
+    orch._listen_and_transcribe = AsyncMock(return_value=phrase)
+    orch._think_and_speak = AsyncMock()
+    orch._control_music = AsyncMock()
+    turn = MagicMock()
+    deadline = asyncio.get_running_loop().time() + 60
+    with caplog.at_level(logging.INFO):
+        result = await orch._handle_turn(active, deadline, False, turn)
+    if expected == "control":
+        assert orch._control_music.call_args.args[0] == MusicCommand("next")
+        orch._think_and_speak.assert_not_awaited()
+    elif expected == "model":
+        orch._think_and_speak.assert_awaited_once_with(phrase.removeprefix("Мира, "))
+        orch._control_music.assert_not_awaited()
+    else:
+        orch._think_and_speak.assert_not_awaited()
+        orch._control_music.assert_not_awaited()
+        assert result == deadline
+        assert turn.result == "not_addressed"
+        assert '"decision": "ignored_music"' in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_music_name_policy_also_applies_to_continuous_activation():
+    orch = make_orchestrator(activation="continuous", music_follow_up="name")
+    orch._wakeword = None
+    orch._music = MagicMock(is_audible=True, has_playback_context=True)
+    orch._think_and_speak = AsyncMock()
+    orch._listen_and_transcribe = AsyncMock(
+        side_effect=["Фоновая песня", "Мира, привет"]
+    )
+    await orch._handle_turn(True, 0, True, MagicMock())
+    orch._think_and_speak.assert_not_awaited()
+    await orch._handle_turn(True, 0, True, MagicMock())
+    orch._think_and_speak.assert_awaited_once_with("привет")
+
+
+@pytest.mark.asyncio
+async def test_confirmed_interruption_is_not_rejected_by_music_policy():
+    orch = make_orchestrator(music_follow_up="name")
+    orch._music = MagicMock(is_audible=True)
+    orch._pending_transcript = "Объясни новый пример"
+    orch._think_and_speak = AsyncMock()
+    orch._listen_and_transcribe = AsyncMock()
+    await orch._handle_turn(False, 0, False, MagicMock())
+    orch._think_and_speak.assert_awaited_once_with("Объясни новый пример")
+    orch._listen_and_transcribe.assert_not_awaited()
 
 
 @pytest.mark.asyncio

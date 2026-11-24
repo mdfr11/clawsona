@@ -115,7 +115,8 @@ class Orchestrator:
         timeout = self._config.conversation_timeout_s
         if active and not continuous:
             timeout = max(0.001, active_until - loop.time())
-        if self._pending_transcript is not None:
+        confirmed_interruption = self._pending_transcript is not None
+        if confirmed_interruption:
             transcript, self._pending_transcript = self._pending_transcript, None
             active = True  # The interruption has already passed activation.
         else:
@@ -141,18 +142,44 @@ class Orchestrator:
                     reason=reason if isinstance(reason, str) else "empty_transcript",
                 )
             return active_until
+        music_restricted = bool(
+            self._music is not None
+            and self._music.is_audible
+            and self._config.music_follow_up != "all"
+            and not confirmed_interruption
+        )
+        bare_control = (
+            parse_music_command(transcript) if self._music is not None else None
+        )
+        music_control_active = bool(
+            music_restricted
+            and self._config.music_follow_up == "commands"
+            and bare_control is not None
+        )
+        require_music_name = music_restricted and not music_control_active
+        wake = self._wakeword
+        if require_music_name and wake is None:
+            from clawsona.wakeword import WakeWordDetector
+
+            wake = WakeWordDetector(
+                self._config.assistant_name, self._config.assistant_aliases
+            )
         with stage_timer("activation") as metrics:
-            addressed = self._wakeword.extract(transcript) if self._wakeword else None
+            addressed = wake.extract(transcript) if wake else None
             metrics["result"] = (
                 "addressed"
                 if addressed is not None
+                else "ignored_music"
+                if require_music_name
                 else "follow_up"
-                if active
+                if active or music_control_active
                 else "ignored"
             )
         if self._config.log_transcripts:
             log_dialogue("TRANSCRIPT", text=transcript, decision=metrics["result"])
-        if not active and addressed is None:
+        if addressed is None and (
+            not (active or music_control_active) or require_music_name
+        ):
             turn.result = "not_addressed"
             return active_until
         name_only = addressed == ""
@@ -160,7 +187,9 @@ class Orchestrator:
             self._transition(State.WAKE)
             logger.info("Распознано обращение по имени")
             transcript = addressed or self._config.assistant_name
-        control = parse_music_command(transcript) if self._music is not None else None
+        control = bare_control
+        if self._music is not None and addressed is not None:
+            control = parse_music_command(transcript)
         if control is not None and not (
             self._music.has_playback_context
             or re.search(

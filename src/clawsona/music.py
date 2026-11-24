@@ -7,6 +7,7 @@ from itertools import islice
 from urllib.parse import urlparse
 
 from clawsona.music_playback import MpvPlayback, PlaybackError
+from clawsona.timing import stage_timer
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,8 @@ class YandexMusicPlayer:
         self._track = None
         self._queue = []
         self._queue_index = -1
+        self._queue_kind = None
+        self._queue_artist = None
         self._paused = False
         self._speech_depth = 0
         self._lock = asyncio.Lock()
@@ -43,6 +46,18 @@ class YandexMusicPlayer:
     @property
     def has_playback_context(self):
         return self._track is not None
+
+    @property
+    def is_audible(self):
+        # Cached playback intent; no provider or IPC round trip in activation.
+        # The EOF/process observer clears the track when playback finishes.
+        return bool(
+            self._track is not None
+            and self._playback.running
+            and not self._paused
+            and not (self._speech_depth and self._speech_mode == "pause")
+            and self._effective_volume > 0
+        )
 
     def _authenticated_client(self):
         from clawsona.yandex_auth import saved_token
@@ -75,10 +90,11 @@ class YandexMusicPlayer:
             )
             if not track or not track.available:
                 continue
-            variants = [i for i in track.get_download_info() if i.codec == "mp3"]
-            if not variants:
-                continue
-            url = max(variants, key=lambda i: i.bitrate_in_kbps).get_direct_link()
+            with stage_timer("music_stream_resolve"):
+                variants = [i for i in track.get_download_info() if i.codec == "mp3"]
+                if not variants:
+                    continue
+                url = max(variants, key=lambda i: i.bitrate_in_kbps).get_direct_link()
             parsed = urlparse(url)
             if (
                 parsed.scheme not in {"http", "https"}
@@ -99,14 +115,53 @@ class YandexMusicPlayer:
 
     def _prepare_play(self, query):
         client = self._authenticated_client()
-        if query:
-            search = client.search(query, type_="track")
-            queue = list(islice(search.tracks.results, 50)) if search.tracks else []
-        else:
-            queue = list(islice(client.users_likes_tracks(), 50))
+        with stage_timer("music_search", source="search" if query else "likes"):
+            if query:
+                search = client.search(query, type_="track")
+                queue = list(islice(search.tracks.results, 50)) if search.tracks else []
+            else:
+                queue = list(islice(client.users_likes_tracks(), 50))
         if not queue:
             raise MusicControlError("Трек не найден в Яндекс Музыке")
         return queue, *self._select_track(queue, 0)
+
+    def _prepare_artist(self, query):
+        client = self._authenticated_client()
+        with stage_timer("music_artist_lookup"):
+            search = client.search(query, type_="artist")
+
+        def normalize(name):
+            return " ".join(name.casefold().replace("ё", "е").split())
+
+        artists = (search.artists.results or []) if search and search.artists else []
+        artist = next(
+            (
+                item
+                for item in islice(artists, 20)
+                if normalize(item.name) == normalize(query)
+            ),
+            None,
+        )
+        if artist is None:
+            raise MusicControlError(
+                "Исполнитель с таким именем не найден. Уточните название."
+            )
+        with stage_timer("music_artist_catalog"):
+            page = artist.get_tracks(page=0, page_size=50)
+        queue, seen = [], set()
+        for track in islice((page.tracks or []) if page else [], 50):
+            if not track or not track.id:
+                continue
+            track_id = str(track.id)
+            if track_id in seen or not any(
+                str(a.id) == str(artist.id) for a in (track.artists or [])
+            ):
+                continue
+            seen.add(track_id)
+            queue.append(track)
+        if not queue:
+            raise MusicControlError("У исполнителя нет доступных треков")
+        return (queue, *self._select_track(queue, 0)), artist.name
 
     def _find_track(self, query):
         _, _, track, url = self._prepare_play(query)
@@ -114,11 +169,12 @@ class YandexMusicPlayer:
 
     async def _load(self, queue, index, track, url):
         try:
-            await self._playback.load(
-                url,
-                volume=self._target_volume(),
-                paused=self._speech_depth > 0 and self._speech_mode == "pause",
-            )
+            with stage_timer("music_load", queue_position=index + 1):
+                await self._playback.load(
+                    url,
+                    volume=self._target_volume(),
+                    paused=self._speech_depth > 0 and self._speech_mode == "pause",
+                )
         except BaseException:
             self._track = None
             raise
@@ -248,11 +304,24 @@ class YandexMusicPlayer:
         self, action: str, query: str = "", *, volume=None, step=10
     ) -> dict:
         async with self._lock:
-            if action == "play":
+            if action in {"play", "play_artist"}:
                 if not isinstance(query, str) or len(query.strip()) > 300:
                     raise MusicControlError("Укажите исполнителя или название трека")
-                prepared = await asyncio.to_thread(self._prepare_play, query.strip())
+                query = query.strip()
+                if action == "play_artist":
+                    if not query:
+                        raise MusicControlError("Укажите имя исполнителя")
+                    prepared, artist = await asyncio.to_thread(
+                        self._prepare_artist, query
+                    )
+                else:
+                    prepared = await asyncio.to_thread(self._prepare_play, query)
+                    artist = None
                 await self._load(*prepared)
+                self._queue_kind = (
+                    "artist" if artist else "search" if query else "likes"
+                )
+                self._queue_artist = artist
             elif action == "next":
                 if not self._queue:
                     raise MusicControlError(
@@ -321,6 +390,8 @@ class YandexMusicPlayer:
                 "effective_volume": self._effective_volume if playing else 0,
                 "queue_position": self._queue_index + 1 if self._queue else 0,
                 "queue_length": len(self._queue),
+                "queue_kind": self._queue_kind,
+                "queue_artist": self._queue_artist,
                 "has_playback_context": self.has_playback_context,
             }
 
