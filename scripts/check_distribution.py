@@ -74,7 +74,6 @@ def check_distribution(directory):
         required = {
             "clawsona/main.py",
             "clawsona/__main__.py",
-            "lyutik/__init__.py",
             "clawsona/openclaw_plugin/index.js",
             "clawsona/openclaw_plugin/openclaw.plugin.json",
             "clawsona/openclaw_plugin/package.json",
@@ -92,11 +91,19 @@ def check_distribution(directory):
         require(prefix + "licenses/LICENSE" in names, "License text missing from wheel")
         entrypoints = configparser.ConfigParser()
         entrypoints.read_string(wheel.read(prefix + "entry_points.txt").decode())
-        for command in ("clawsona", "lyutik"):
-            require(
-                entrypoints.get("console_scripts", command) == "clawsona.main:main",
-                f"Missing CLI entrypoint: {command}",
-            )
+        require(
+            dict(entrypoints["console_scripts"]) == {"clawsona": "clawsona.main:main"},
+            "Expected only the clawsona CLI entrypoint",
+        )
+        require(
+            {
+                n.split("/")[0]
+                for n in names
+                if not n.split("/")[0].endswith(".dist-info")
+            }
+            == {"clawsona"},
+            "Unexpected top-level package in wheel",
+        )
         manifest = json.loads(
             wheel.read("clawsona/openclaw_plugin/openclaw.plugin.json")
         )
@@ -114,7 +121,6 @@ def check_distribution(directory):
             "uv.lock",
             ".env.example",
             "src/clawsona/main.py",
-            "src/lyutik/__init__.py",
             "openclaw/clawsona-tools/index.js",
             ".github/workflows/ci.yml",
             "docs/README.ru.md",
@@ -130,7 +136,7 @@ def check_distribution(directory):
                 root + required in names, f"Missing source release file: {required}"
             )
     print(
-        f"Verified ClawSona {version}: wheel, source, CLI aliases, plugin, license and runtime exclusions."
+        f"Verified ClawSona {version}: wheel, source, CLI, plugin, license and runtime exclusions."
     )
 
 

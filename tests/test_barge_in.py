@@ -13,9 +13,9 @@ from clawsona.wakeword import WakeWordDetector
 @pytest.mark.parametrize(
     "heard,reply,echo",
     [
-        ("Лютик, привет!", "Лютик, привет! Давай поговорим.", True),
-        ("Лютик", "Я Лютик, твой помощник.", True),
-        ("Лютик, другой вопрос", "Привет, я Лютик.", False),
+        ("Мира, привет!", "Мира, привет! Давай поговорим.", True),
+        ("Мира", "Я Мира, твой помощник.", True),
+        ("Мира, другой вопрос", "Привет, я Мира.", False),
         ("Mira, wait, another question", "Welcome back to our lesson.", False),
         ("", "Привет!", False),
     ],
@@ -25,30 +25,28 @@ def test_reply_echo_guard(heard, reply, echo):
 
 
 def test_only_a_known_echo_prefix_can_be_removed_before_a_direct_address():
-    wake = WakeWordDetector("Лютик")
+    wake = WakeWordDetector("Мира")
     assert (
         addressed_interruption(
-            "Объясняю дроби. Лютик, другой вопрос", "Объясняю дроби на примерах.", wake
+            "Объясняю дроби. Мира, другой вопрос", "Объясняю дроби на примерах.", wake
         )
-        == "Лютик, другой вопрос"
+        == "Мира, другой вопрос"
     )
     assert (
-        addressed_interruption(
-            "Мы вчера видели Лютик на улице", "Объясняю дроби.", wake
-        )
+        addressed_interruption("Мы вчера видели Мира на улице", "Объясняю дроби.", wake)
         is None
     )
 
 
 def test_echo_guard_normalizes_configured_aliases_across_languages():
-    assert is_reply_echo("Lyutik", "Я Лютик.", ["Лютик", "Lyutik"])
+    assert is_reply_echo("Mira", "Я Мира.", ["Мира", "Mira"])
 
 
 def listener(mocker, *, mode="name", texts=(), frames=25, events=None, **overrides):
     config = Settings(
         _env_file=None,
-        assistant_name="Лютик",
-        assistant_aliases=["Lyutik"],
+        assistant_name="Мира",
+        assistant_aliases=["Mira"],
         barge_in_mode=mode,
         **({"barge_in_check_interval_ms": 500} | overrides),
     )
@@ -72,14 +70,12 @@ def listener(mocker, *, mode="name", texts=(), frames=25, events=None, **overrid
 
 @pytest.mark.asyncio
 async def test_name_confirmation_stops_early_but_keeps_full_question_and_onset(mocker):
-    watch, audio, stt = listener(
-        mocker, texts=["Лютик", "Лютик, объясни другой пример"]
-    )
+    watch, audio, stt = listener(mocker, texts=["Мира", "Мира, объясни другой пример"])
     on_interrupt = MagicMock()
     result = await asyncio.wait_for(
         watch.listen(on_interrupt, lambda: "Старый ответ"), 1
     )
-    assert result == "Лютик, объясни другой пример"
+    assert result == "Мира, объясни другой пример"
     on_interrupt.assert_called_once()
     assert stt.transcribe_buffer.await_count == 2
     partial, full = [
@@ -97,17 +93,17 @@ async def test_echo_and_unaddressed_speech_cannot_interrupt(mocker):
         mocker,
         frames=60,
         texts=[
-            "Лютик, привет",
+            "Мира, привет",
             "фоновый разговор",
-            "Lyutik, another question",
-            "Lyutik, another question please",
+            "Mira, another question",
+            "Mira, another question please",
         ],
     )
     on_interrupt = MagicMock()
     result = await asyncio.wait_for(
-        watch.listen(on_interrupt, lambda: "Лютик, привет! Чем помочь?"), 1
+        watch.listen(on_interrupt, lambda: "Мира, привет! Чем помочь?"), 1
     )
-    assert result == "Lyutik, another question please"
+    assert result == "Mira, another question please"
     on_interrupt.assert_called_once()
     assert stt.transcribe_buffer.await_count == 4
 
@@ -162,10 +158,10 @@ async def test_maximum_recording_length_is_respected(mocker):
 
 @pytest.mark.asyncio
 async def test_rejected_final_recognition_does_not_forward_a_partial_question(mocker):
-    watch, audio, stt = listener(mocker, texts=["Лютик, объясни", ""])
+    watch, audio, stt = listener(mocker, texts=["Мира, объясни", ""])
     assert (
         await asyncio.wait_for(watch.listen(MagicMock(), lambda: "Old answer"), 1)
-        == "Лютик"
+        == "Мира"
     )
 
 
@@ -175,7 +171,7 @@ async def test_name_checks_work_when_max_utterance_is_shorter_than_check_interva
 ):
     watch, audio, stt = listener(
         mocker,
-        texts=["Лютик", "Лютик, другой вопрос"],
+        texts=["Мира", "Мира, другой вопрос"],
         frames=1000,
         events={1: "speech_start"},
         max_utterance_s=1,
@@ -185,7 +181,7 @@ async def test_name_checks_work_when_max_utterance_is_shorter_than_check_interva
     result = await asyncio.wait_for(
         watch.listen(on_interrupt, lambda: "Старый ответ"), 1
     )
-    assert result == "Лютик, другой вопрос"
+    assert result == "Мира, другой вопрос"
     on_interrupt.assert_called_once()
     assert len(stt.transcribe_buffer.call_args.args[0]) <= 16000 * 2
 
@@ -212,9 +208,9 @@ async def test_name_spoken_during_slow_check_is_not_lost_in_a_cadence_gap(mocker
         if calls == 2:
             # Marker 20 represents the short name spoken during the first check.
             if 20 in np.frombuffer(data, dtype=np.int16):
-                return "Лютик, другой вопрос"
+                return "Мира, другой вопрос"
             return "другой вопрос"
-        return "Лютик, другой вопрос целиком"
+        return "Мира, другой вопрос целиком"
 
     audio.read_async = read
     stt.transcribe_buffer.side_effect = recognize
@@ -222,5 +218,5 @@ async def test_name_spoken_during_slow_check_is_not_lost_in_a_cadence_gap(mocker
     result = await asyncio.wait_for(
         watch.listen(on_interrupt, lambda: "Старый ответ"), 1
     )
-    assert result == "Лютик, другой вопрос целиком"
+    assert result == "Мира, другой вопрос целиком"
     on_interrupt.assert_called_once()

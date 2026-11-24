@@ -15,8 +15,6 @@ from clawsona.prompts import AGENT_SYSTEM_PROMPT, build_system_prompt
 def test_model_identity_is_configured_in_all_modes(name, agent):
     prompt = build_system_prompt(name, agent=agent)
     assert json.dumps(name, ensure_ascii=False) in prompt
-    assert "Лютик" not in prompt
-    assert "Ведьмак" not in prompt
     assert "только по твоему имени" in prompt
     assert ("clawsona_weather" in prompt) is agent
     # The stored workspace instructions are name-neutral. A changed config
@@ -39,7 +37,7 @@ async def test_openclaw_setup_preserves_configured_name_and_activation(
     spawn = AsyncMock(return_value=process)
     monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
     env = tmp_path / ".env"
-    env.write_text("ACTIVATION=continuous\nWAKE_WORD=Мира\nOTHER_SETTING=keep\n")
+    env.write_text("ACTIVATION=continuous\nASSISTANT_NAME=Мира\nOTHER_SETTING=keep\n")
     config = Settings(
         _env_file=env, assistant_aliases=["Mira"], deepseek_api_key="fixture-key"
     )

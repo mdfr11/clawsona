@@ -299,7 +299,7 @@ def create_stt(config):
         return LocalSTT(
             config.whisper_model_path,
             cpu_threads=config.whisper_cpu_threads,
-            wake_word=config.wake_word,
+            wake_word=config.assistant_name,
             name_aliases=config.assistant_aliases,
             hotwords=config.stt_hotwords,
             beam_size=config.whisper_beam_size,

@@ -8,8 +8,7 @@ from aiohttp import web
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("module", ["clawsona", "lyutik"])
-async def test_text_cli_with_actual_http_server_and_no_speech_keys(tmp_path, module):
+async def test_text_cli_with_actual_http_server_and_no_speech_keys(tmp_path):
     received = []
 
     async def handler(request):
@@ -42,7 +41,7 @@ async def test_text_cli_with_actual_http_server_and_no_speech_keys(tmp_path, mod
         process = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
-            module,
+            "clawsona",
             "--text",
             env=env,
             stdin=asyncio.subprocess.PIPE,

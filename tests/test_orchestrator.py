@@ -21,8 +21,8 @@ def make_orchestrator(**overrides):
         **(
             {
                 "llm_provider": "deepseek",
-                "assistant_name": "Лютик",
-                "assistant_aliases": ["Lyutik", "Lutik"],
+                "assistant_name": "Мира",
+                "assistant_aliases": ["Mira", "Meera"],
                 "barge_in_enabled": False,
             }
             | overrides
@@ -70,16 +70,16 @@ async def test_barge_in_cancels_output_and_generation_then_handles_complete_new_
         notify()
         await asyncio.wait_for(output_stopped.wait(), 1)
         input_complete.set()
-        return "Лютик, теперь объясни дроби"
+        return "Мира, теперь объясни дроби"
 
     orch._barge_listener = MagicMock(listen=listen)
     orch._chat.chat_stream = stream
     orch._tts.speak.side_effect = speak
-    orch._listen_and_transcribe = AsyncMock(return_value="Лютик, первый вопрос")
+    orch._listen_and_transcribe = AsyncMock(return_value="Мира, первый вопрос")
     turn = MagicMock()
     deadline = await asyncio.wait_for(orch._handle_turn(False, 0, False, turn), 2)
     assert input_complete.is_set() and generator_closed.is_set()
-    assert orch._pending_transcript == "Лютик, теперь объясни дроби"
+    assert orch._pending_transcript == "Мира, теперь объясни дроби"
     assert turn.result == "interrupted" and deadline > asyncio.get_running_loop().time()
     assert "Очень длинный" not in orch._conversation_history[-1]["content"]
     assert "interrupted" in orch._conversation_history[-1]["content"]
@@ -102,7 +102,7 @@ async def test_barge_in_cancels_output_and_generation_then_handles_complete_new_
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("transcript", ["Лютик", "Лютик, стоп", "Lyutik, wait"])
+@pytest.mark.parametrize("transcript", ["Мира", "Мира, стоп", "Mira, wait"])
 async def test_name_or_silence_interrupts_without_ack_or_music_control(transcript):
     orch = make_orchestrator(barge_in_enabled=True)
     stopped = asyncio.Event()
@@ -176,7 +176,7 @@ async def test_barge_in_preserves_music_speech_guard_until_user_finishes():
         notify()
         await asyncio.wait_for(stopped.wait(), 1)
         assert depth > 0
-        return "Лютик, другой вопрос"
+        return "Мира, другой вопрос"
 
     orch._music = MagicMock(pause_for_speech=guard, command=AsyncMock())
     orch._barge_listener = MagicMock(listen=listen)
@@ -189,7 +189,7 @@ async def test_barge_in_preserves_music_speech_guard_until_user_finishes():
 @pytest.mark.asyncio
 async def test_music_stop_is_executed_locally_without_a_model_call():
     orch = make_orchestrator()
-    orch._listen_and_transcribe = AsyncMock(return_value="Лютик, стоп")
+    orch._listen_and_transcribe = AsyncMock(return_value="Мира, стоп")
     orch._think_and_speak = AsyncMock()
     events = []
 
@@ -250,7 +250,7 @@ async def test_local_music_controls_still_require_activation():
 async def test_continue_without_a_music_context_stays_in_the_conversation():
     orch = make_orchestrator()
     orch._music = MagicMock(has_playback_context=False, command=AsyncMock())
-    orch._listen_and_transcribe = AsyncMock(return_value="Лютик, продолжить")
+    orch._listen_and_transcribe = AsyncMock(return_value="Мира, продолжить")
     orch._think_and_speak = AsyncMock()
     await orch._handle_turn(False, 0, False, MagicMock())
     orch._music.command.assert_not_awaited()
@@ -465,9 +465,9 @@ async def test_openclaw_final_reply_uses_one_tts_call_and_prepares_while_model_w
 
 @pytest.mark.asyncio
 async def test_custom_name_and_alias_are_used_throughout_a_conversation():
-    orch = make_orchestrator(assistant_name="Мира", assistant_aliases=["Mira"])
+    orch = make_orchestrator(assistant_name="Атлас", assistant_aliases=["Atlas"])
     orch._listen_and_transcribe = AsyncMock(
-        side_effect=["Mira", "Мира, привет", asyncio.CancelledError()]
+        side_effect=["Atlas", "Атлас, привет", asyncio.CancelledError()]
     )
     received = []
 
@@ -478,10 +478,10 @@ async def test_custom_name_and_alias_are_used_throughout_a_conversation():
     orch._chat.chat_stream = stream
     with pytest.raises(asyncio.CancelledError):
         await orch.run()
-    assert [messages[-1]["content"] for messages in received] == ["Мира", "привет"]
+    assert [messages[-1]["content"] for messages in received] == ["Атлас", "привет"]
     for messages in received:
-        assert '"Мира"' in messages[0]["content"]
-        assert "Лютик" not in messages[0]["content"]
+        assert '"Атлас"' in messages[0]["content"]
+        assert "Мира" not in messages[0]["content"]
 
 
 @pytest.mark.asyncio
@@ -582,10 +582,10 @@ async def test_full_conversation_preserves_context_until_explicit_reset():
     orch = make_orchestrator()
     orch._listen_and_transcribe = AsyncMock(
         side_effect=[
-            "Лютик, что такое дробь?",
+            "Мира, что такое дробь?",
             None,
-            "Лютик, приведи пример",
-            "Лютик, новый разговор",
+            "Мира, приведи пример",
+            "Мира, новый разговор",
             "Стоп",
             asyncio.CancelledError(),
         ]
@@ -608,7 +608,7 @@ async def test_full_conversation_preserves_context_until_explicit_reset():
 async def test_name_and_question_need_no_acknowledgment_barrier():
     orch = make_orchestrator()
     orch._listen_and_transcribe = AsyncMock(
-        side_effect=["Лютик, привет, какая погода в Крымске?", asyncio.CancelledError()]
+        side_effect=["Мира, привет, какая погода в Крымске?", asyncio.CancelledError()]
     )
     received = []
 
@@ -629,7 +629,7 @@ async def test_name_and_question_need_no_acknowledgment_barrier():
 async def test_name_only_ack_is_generated_by_model_and_background_stays_local():
     orch = make_orchestrator()
     orch._listen_and_transcribe = AsyncMock(
-        side_effect=["Включи телевизор", "Лютик", asyncio.CancelledError()]
+        side_effect=["Включи телевизор", "Мира", asyncio.CancelledError()]
     )
     received = []
 
@@ -641,7 +641,7 @@ async def test_name_only_ack_is_generated_by_model_and_background_stays_local():
     with pytest.raises(asyncio.CancelledError):
         await orch.run()
     assert len(received) == 1
-    assert received[0][-1]["content"] == "Лютик"
+    assert received[0][-1]["content"] == "Мира"
     orch._tts.speak.assert_awaited_once_with("Да, я здесь!")
 
 
@@ -653,7 +653,7 @@ async def test_name_only_acknowledgment_is_one_model_selected_phrase():
         yield "Да, что хотел?\n\nДа, что хотел?"
 
     orch._chat.chat_stream = stream
-    await orch._think_and_speak("Лютик")
+    await orch._think_and_speak("Мира")
     orch._tts.speak.assert_awaited_once_with("Да, что хотел?")
     assert orch._conversation_history[-1]["content"] == "Да, что хотел?"
 
@@ -663,11 +663,11 @@ async def test_answer_returns_to_name_activation_and_noise_never_reaches_model()
     orch = make_orchestrator(follow_up_without_name=False)
     orch._listen_and_transcribe = AsyncMock(
         side_effect=[
-            "Лютик, объясни дроби",
+            "Мира, объясни дроби",
             "",
             "длинный длинный длинный",
             "Субтитры сделал автор",
-            "Лютик, приведи пример",
+            "Мира, приведи пример",
             asyncio.CancelledError(),
         ]
     )
@@ -685,7 +685,7 @@ async def test_name_alone_opens_one_question_window_and_rejected_noise_is_ignore
     orch = make_orchestrator(follow_up_without_name=False)
     orch._listen_and_transcribe = AsyncMock(
         side_effect=[
-            "Лютик",
+            "Мира",
             "",
             "объясни дроби",
             "посторонняя речь",
@@ -696,7 +696,7 @@ async def test_name_alone_opens_one_question_window_and_rejected_noise_is_ignore
     with pytest.raises(asyncio.CancelledError):
         await orch.run()
     assert [c.args[0] for c in orch._think_and_speak.await_args_list] == [
-        "Лютик",
+        "Мира",
         "объясни дроби",
     ]
 
@@ -711,7 +711,7 @@ async def test_noise_does_not_extend_follow_up_deadline(mocker):
     ).get_running_loop.return_value = clock
     orch._listen_and_transcribe = AsyncMock(
         side_effect=[
-            "Лютик",
+            "Мира",
             "",
             "",
             "посторонняя речь",
@@ -721,7 +721,7 @@ async def test_noise_does_not_extend_follow_up_deadline(mocker):
     orch._think_and_speak = AsyncMock()
     with pytest.raises(asyncio.CancelledError):
         await orch.run()
-    orch._think_and_speak.assert_awaited_once_with("Лютик")
+    orch._think_and_speak.assert_awaited_once_with("Мира")
 
 
 @pytest.mark.asyncio
@@ -729,7 +729,7 @@ async def test_default_free_follow_up_remains_available():
     orch = make_orchestrator()
     orch._listen_and_transcribe = AsyncMock(
         side_effect=[
-            "Лютик, объясни дроби",
+            "Мира, объясни дроби",
             "приведи пример",
             None,
             "посторонняя речь",
@@ -750,7 +750,7 @@ async def test_english_goodbye_ends_conversation_with_english_farewell():
     orch = make_orchestrator()
     orch._listen_and_transcribe = AsyncMock(
         side_effect=[
-            "Лютик, давай говорить на английском",
+            "Мира, давай говорить на английском",
             "Goodbye!",
             "Background speech",
             asyncio.CancelledError(),
@@ -769,7 +769,7 @@ async def test_learning_dialogue_needs_name_once_and_goodbye_closes_it():
     orch._listen_and_transcribe = AsyncMock(
         side_effect=[
             "Посторонний разговор",
-            "Лютик, помоги с английским",
+            "Мира, помоги с английским",
             "Я совсем с нуля",
             "",
             "Хочу понимать речь на слух",
@@ -805,7 +805,7 @@ async def test_transcript_logs_show_routing_and_actual_model_input(caplog):
     orch._listen_and_transcribe = AsyncMock(
         side_effect=[
             "Посторонняя речь",
-            "Лютик, объясни дроби",
+            "Мира, объясни дроби",
             "Приведи пример",
             "",
             asyncio.CancelledError(),
@@ -822,7 +822,7 @@ async def test_transcript_logs_show_routing_and_actual_model_input(caplog):
         "follow_up",
         "rejected",
     ]
-    assert transcripts[1]["text"] == "Лютик, объясни дроби"
+    assert transcripts[1]["text"] == "Мира, объясни дроби"
     assert [e["text"] for e in model_inputs] == ["объясни дроби", "Приведи пример"]
     assert model_inputs[0]["turn"] == transcripts[1]["turn"]
     assert model_inputs[1]["turn"] == transcripts[2]["turn"]
@@ -835,7 +835,7 @@ async def test_transcript_logging_can_be_disabled_without_losing_timings(caplog)
     caplog.set_level("INFO", logger="clawsona.timing")
     orch = make_orchestrator(log_transcripts=False)
     orch._listen_and_transcribe = AsyncMock(
-        side_effect=["Лютик, привет", asyncio.CancelledError()]
+        side_effect=["Мира, привет", asyncio.CancelledError()]
     )
     with pytest.raises(asyncio.CancelledError):
         await orch.run()

@@ -29,7 +29,7 @@ def local_stt(tmp_path, mocker):
     timestamps.side_effect = lambda audio, options: [{"start": 0, "end": len(audio)}]
     model_class.return_value.transcribe.return_value = (iter([segment()]), None)
     return LocalSTT(
-        tmp_path, cpu_threads=2, wake_word="Лютик", name_aliases=["Lyutik", "Lutik"]
+        tmp_path, cpu_threads=2, wake_word="Мира", name_aliases=["Mira", "Meera"]
     )
 
 
@@ -57,7 +57,7 @@ async def test_whisper_receives_correct_audio_format_and_offline_settings(local_
     options = local_stt._model.transcribe.call_args.kwargs
     assert options["temperature"] == 0
     assert options["condition_on_previous_text"] is False
-    assert options["initial_prompt"] == "Лютик."
+    assert options["initial_prompt"] == "Мира."
     assert options["hotwords"] is None
     assert options["language"] == "ru"
     assert options["task"] == "transcribe"
@@ -124,7 +124,7 @@ async def test_english_is_transcribed_without_russian_language_or_name_prompt(
     options = local_stt._model.transcribe.call_args.kwargs
     assert options["language"] == "en"
     assert options["task"] == "transcribe"
-    assert options["initial_prompt"] == "Lyutik."
+    assert options["initial_prompt"] == "Mira."
     assert local_stt.last_language == "en"
 
 

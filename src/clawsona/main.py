@@ -86,7 +86,9 @@ async def async_main(config: Settings | None = None, *, music=None) -> None:
             config.elevenlabs_voice_id,
             "включён" if config.elevenlabs_fallback else "отключён",
         )
-    activation = f"Скажи «{config.wake_word}»" if wakeword else "Говори после ответа"
+    activation = (
+        f"Скажи «{config.assistant_name}»" if wakeword else "Говори после ответа"
+    )
     if config.barge_in_enabled:
         logger.info(
             "Прерывание ответа: %s",

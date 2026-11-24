@@ -45,8 +45,6 @@ def child_env(config):
         "DEEPSEEK_API_KEY": config.deepseek_api_key,
         "OPENCLAW_GATEWAY_TOKEN": config.openclaw_gateway_token,
         "CLAWSONA_TOOLS_TOKEN": config.clawsona_tools_token,
-        # Previously generated profiles can still refer to this placeholder.
-        "LYUTIK_TOOLS_TOKEN": config.clawsona_tools_token,
     }
 
 

@@ -75,7 +75,7 @@ session status and, only when configured, music.
 
 ## Configuration, models and observability
 
-- `config.py`: typed `.env` settings, configurable name and legacy aliases.
+- `config.py`: typed `.env` settings, configurable name and explicit name aliases.
 - `models.py`: explicit one-time downloads. Normal startup uses local models.
 - `diagnostics.py`: configuration checks and opt-in live model/speech checks.
 - `timing.py`: monotonic stage measurements and per-turn context. Some stages

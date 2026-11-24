@@ -6,9 +6,7 @@ from pathlib import Path
 
 
 def token_path():
-    current = Path.home() / ".local/share/clawsona/yandex-auth.json"
-    legacy = Path.home() / ".local/share/lyutik/yandex-auth.json"
-    return legacy if not current.exists() and legacy.is_file() else current
+    return Path.home() / ".local/share/clawsona/yandex-auth.json"
 
 
 def saved_token():

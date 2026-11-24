@@ -21,7 +21,7 @@ async def main():
     recorder = Orchestrator(
         config, audio, detector, vad, create_stt(config), None, None
     )
-    print(f"Ожидаю обращение {config.wake_word}. Ctrl+C для выхода.", flush=True)
+    print(f"Ожидаю обращение {config.assistant_name}. Ctrl+C для выхода.", flush=True)
     while True:
         text = await recorder._listen_and_transcribe()
         if text is not None:

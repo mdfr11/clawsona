@@ -2,7 +2,7 @@ import unicodedata
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -17,9 +17,7 @@ def normalize_name(value: str) -> str:
 
 
 def default_models_dir() -> Path:
-    current = Path.home() / ".local/share/clawsona/models"
-    legacy = Path.home() / ".local/share/lyutik/models"
-    return legacy if not current.exists() and legacy.is_dir() else current
+    return Path.home() / ".local/share/clawsona/models"
 
 
 class Settings(BaseSettings):
@@ -37,17 +35,8 @@ class Settings(BaseSettings):
     openclaw_gateway_token: str = Field("", repr=False)
     openclaw_agent: str = Field("clawsona", pattern=r"^[a-z0-9][a-z0-9_-]{0,63}$")
     openclaw_profile: str = Field("clawsona", pattern=r"^[a-z0-9][a-z0-9_-]{0,63}$")
-    clawsona_tools_token: str = Field(
-        "",
-        repr=False,
-        validation_alias=AliasChoices("CLAWSONA_TOOLS_TOKEN", "LYUTIK_TOOLS_TOKEN"),
-    )
-    clawsona_tools_port: int = Field(
-        18792,
-        ge=1024,
-        le=65535,
-        validation_alias=AliasChoices("CLAWSONA_TOOLS_PORT", "LYUTIK_TOOLS_PORT"),
-    )
+    clawsona_tools_token: str = Field("", repr=False)
+    clawsona_tools_port: int = Field(18792, ge=1024, le=65535)
     yandex_music_token: str = Field("", repr=False)
     music_enabled: bool = False
     music_volume: int = Field(50, ge=0, le=100)
@@ -90,10 +79,7 @@ class Settings(BaseSettings):
     )
 
     activation: Literal["name", "continuous"] = "name"
-    assistant_name: str = Field(
-        "Ассистент",
-        validation_alias=AliasChoices("ASSISTANT_NAME", "WAKE_WORD", "wake_word"),
-    )
+    assistant_name: str = "Ассистент"
     assistant_aliases: Annotated[list[str], NoDecode] = Field(default_factory=list)
     # Every speech component consumes the same PCM format.
     sample_rate: Literal[16000] = 16000
@@ -129,11 +115,6 @@ class Settings(BaseSettings):
         if not isinstance(value, (list, tuple)):
             raise ValueError("Варианты имени задаются списком или через запятую")
         return list(dict.fromkeys(normalize_name(item) for item in value))
-
-    @property
-    def wake_word(self) -> str:
-        """Legacy Python accessor; new configurations use ASSISTANT_NAME."""
-        return self.assistant_name
 
     @field_validator("log_file", mode="before")
     @classmethod

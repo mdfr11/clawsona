@@ -159,7 +159,7 @@ class Orchestrator:
         if addressed is not None:
             self._transition(State.WAKE)
             logger.info("Распознано обращение по имени")
-            transcript = addressed or self._config.wake_word
+            transcript = addressed or self._config.assistant_name
         control = parse_music_command(transcript) if self._music is not None else None
         if control is not None and not (
             self._music.has_playback_context
@@ -496,7 +496,9 @@ class Orchestrator:
                 input_mode="voice" if self._audio is not None else "text",
             )
         reply_started = time.perf_counter()
-        name_only = transcript.strip().casefold() == self._config.wake_word.casefold()
+        name_only = (
+            transcript.strip().casefold() == self._config.assistant_name.casefold()
+        )
         history = (
             self._conversation_history[-2 * (self._config.max_history_turns - 1) :]
             if self._config.max_history_turns > 1

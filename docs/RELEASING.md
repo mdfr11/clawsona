@@ -12,7 +12,7 @@ uv build
 uv run python scripts/check_distribution.py dist
 ```
 
-The distribution checker verifies the plugin, CLI aliases, license, source files
+The distribution checker verifies the plugin, CLI entrypoint, license, source files
 and exclusion of environment files, runtime state, models and recordings. Review
 the actual source changes too; filename checks do not replace secret scanning.
 For a new version, keep `pyproject.toml` and the plugin's `package.json` version

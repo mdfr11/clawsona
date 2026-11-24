@@ -204,23 +204,6 @@ OpenClaw installation or physical audio devices. `doctor --check-llm` and
 `doctor --check-speech` are separate, opt-in integration checks. See
 [CONTRIBUTING](CONTRIBUTING.md) and [security reporting](SECURITY.md).
 
-## Upgrading from Lyutik
-
-Keep your `.env` and downloaded models. If the old settings did not explicitly
-set a profile/agent, add `OPENCLAW_PROFILE=lyutik` and `OPENCLAW_AGENT=lyutik` to
-keep the existing OpenClaw sessions. Stop the application and any separately
-started ClawSona gateway before reconfiguration:
-
-```bash
-uv sync --frozen
-uv run clawsona openclaw-setup
-uv run clawsona
-```
-
-The old `lyutik` CLI, `python -m lyutik`, `WAKE_WORD`, and `LYUTIK_TOOLS_*`
-variables remain compatible. Existing model/auth caches are reused when the new
-locations do not exist. The workspace directory itself does not need renaming.
-
 ## License
 
 ClawSona is licensed under [GPL-3.0-or-later](LICENSE). Dependencies, model weights

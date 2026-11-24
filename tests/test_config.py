@@ -65,7 +65,7 @@ def test_only_selected_provider_needs_key():
     [
         {"sample_rate": 8000},
         {"llm_provider": "removed-agent"},
-        {"wake_word": ""},
+        {"assistant_name": ""},
         {"max_utterance_s": 0},
         {"vad_threshold": 5},
         {"max_history_turns": 0},
@@ -96,19 +96,16 @@ def test_paths_devices_and_url(tmp_path):
 def test_custom_name_and_csv_aliases_can_be_set_in_environment(monkeypatch):
     monkeypatch.setenv("ASSISTANT_NAME", "  Жан   Люк  ")
     monkeypatch.setenv("ASSISTANT_ALIASES", "Jean Luc, Captain")
-    monkeypatch.setenv("WAKE_WORD", "старое имя")
     config = Settings(_env_file=None)
     assert config.assistant_name == "Жан Люк"
-    assert config.wake_word == config.assistant_name
     assert config.assistant_aliases == ["Jean Luc", "Captain"]
 
 
-def test_old_env_name_is_supported_and_explicit_name_wins(tmp_path):
+def test_explicit_assistant_name_overrides_environment_file(tmp_path):
     path = tmp_path / ".env"
-    path.write_text("WAKE_WORD=Лютик\n")
-    assert Settings(_env_file=path).assistant_name == "Лютик"
-    assert Settings(_env_file=path, assistant_name="Мира").assistant_name == "Мира"
-    assert Settings(_env_file=None, wake_word="Атлас").assistant_name == "Атлас"
+    path.write_text("ASSISTANT_NAME=Мира\n")
+    assert Settings(_env_file=path).assistant_name == "Мира"
+    assert Settings(_env_file=path, assistant_name="Атлас").assistant_name == "Атлас"
 
 
 @pytest.mark.parametrize(
@@ -118,7 +115,7 @@ def test_old_env_name_is_supported_and_explicit_name_wins(tmp_path):
         {"assistant_name": "А\nБ"},
         {"assistant_name": "123"},
         {"assistant_aliases": [""]},
-        {"assistant_aliases": "Mira,\nLyutik"},
+        {"assistant_aliases": "Mira,\nMira"},
     ],
 )
 def test_invalid_identity_is_rejected(values):
