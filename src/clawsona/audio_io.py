@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import queue
+import threading
 
 import numpy as np
 import sounddevice as sd
@@ -101,18 +102,30 @@ class AudioCapture:
             yield await self.read_async()
 
 
-def _play_sync(audio_data: bytes, sample_rate: int = 44100, device=None) -> None:
+def _play_sync(
+    audio_data: bytes, sample_rate: int = 44100, device=None, cancelled=None
+) -> None:
+    if cancelled is not None and cancelled.is_set():
+        return
     sd.play(
         np.frombuffer(audio_data, dtype=np.int16), samplerate=sample_rate, device=device
     )
+    if cancelled is not None and cancelled.is_set():
+        sd.stop()
     sd.wait()
 
 
 async def play_audio_async(
     audio_data: bytes, sample_rate: int = 44100, device=None
 ) -> None:
+    cancelled = threading.Event()
+    worker = asyncio.create_task(
+        asyncio.to_thread(_play_sync, audio_data, sample_rate, device, cancelled)
+    )
     try:
-        await asyncio.to_thread(_play_sync, audio_data, sample_rate, device)
+        await asyncio.shield(worker)
     except asyncio.CancelledError:
+        cancelled.set()
         sd.stop()
+        await asyncio.gather(worker, return_exceptions=True)
         raise

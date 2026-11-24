@@ -1,3 +1,5 @@
+import asyncio
+import threading
 from types import SimpleNamespace
 
 import numpy as np
@@ -59,6 +61,36 @@ async def test_whisper_receives_correct_audio_format_and_offline_settings(local_
     assert options["hotwords"] is None
     assert options["language"] == "ru"
     assert options["task"] == "transcribe"
+
+
+@pytest.mark.asyncio
+async def test_cancelled_whisper_check_finishes_before_model_can_be_reused(
+    local_stt, mocker
+):
+    started = asyncio.Event()
+    release, finished = threading.Event(), threading.Event()
+    loop = asyncio.get_running_loop()
+
+    def decode(data):
+        loop.call_soon_threadsafe(started.set)
+        release.wait(3)
+        finished.set()
+        return "old result"
+
+    mocker.patch.object(local_stt, "_transcribe", side_effect=decode)
+    task = asyncio.create_task(local_stt.transcribe_buffer(b"\0\0"))
+    try:
+        await asyncio.wait_for(started.wait(), 1)
+        task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert finished.is_set()
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
 
 
 @pytest.mark.asyncio
@@ -274,6 +306,40 @@ async def test_wav_export_never_opens_speakers(tmp_path, mocker):
     await PiperTTS(path).save_wav("Привет", destination)
     assert destination.read_bytes().startswith(b"RIFF")
     stream.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_piper_joins_its_output_worker_before_returning(
+    tmp_path, mocker
+):
+    path = tmp_path / "voice.onnx"
+    path.write_bytes(b"placeholder")
+    path.with_suffix(".onnx.json").write_text("{}")
+    mocker.patch("piper.PiperVoice")
+    tts = PiperTTS(path)
+    started = asyncio.Event()
+    release, finished = threading.Event(), threading.Event()
+    loop = asyncio.get_running_loop()
+
+    def output(text):
+        loop.call_soon_threadsafe(started.set)
+        release.wait(3)
+        finished.set()
+
+    mocker.patch.object(tts, "_speak", side_effect=output)
+    task = asyncio.create_task(tts.speak("Старый ответ"))
+    try:
+        await asyncio.wait_for(started.wait(), 1)
+        task.cancel()
+        await asyncio.sleep(0)
+        assert tts._cancelled.is_set() and not task.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert finished.is_set()
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
 
 
 def test_missing_local_models_have_actionable_errors(tmp_path):

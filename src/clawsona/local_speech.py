@@ -168,7 +168,14 @@ class LocalSTT:
             self.last_language = None
             self.last_language_probability = None
             return ""
-        return await asyncio.to_thread(self._transcribe, audio_data)
+        worker = asyncio.create_task(asyncio.to_thread(self._transcribe, audio_data))
+        try:
+            return await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            # Whisper's CPU work cannot be cancelled. Join it before a subsequent
+            # recording can reuse the model or its recognition diagnostics.
+            await asyncio.gather(worker, return_exceptions=True)
+            raise
 
 
 class PiperTTS:
@@ -272,10 +279,12 @@ class PiperTTS:
 
     async def speak(self, text: str) -> None:
         self._cancelled.clear()
+        worker = asyncio.create_task(asyncio.to_thread(self._speak, text))
         try:
-            await asyncio.to_thread(self._speak, text)
+            await asyncio.shield(worker)
         except asyncio.CancelledError:
             self.stop()
+            await asyncio.gather(worker, return_exceptions=True)
             raise
 
     def stop(self) -> None:

@@ -25,8 +25,20 @@ audio, activation, transcription, playback and the local tool HTTP server.
    the configured identity on each request.
 6. The final OpenClaw reply is spoken through local bilingual Piper or
    `elevenlabs_tts.py`. ElevenLabs can preconnect while the model thinks; no text
-   is sent for synthesis until a reply is available. The microphone stays closed
-   during playback. An optional Piper fallback handles failures before playback.
+   is sent for synthesis until a reply is available. An optional Piper fallback
+   handles failures before playback.
+7. `barge_in.py` monitors the microphone only after speech starts. The default
+   name mode runs bounded STT windows, checks the configured name/aliases and
+   rejects text matching the answer. This is a text echo guard, not AEC.
+   Headphone-only speech mode confirms on VAD instead. On confirmation the
+   orchestrator cancels and joins the reply task (producer and TTS), keeps the
+   music speech guard active, and finishes recording the new phrase without
+   losing its buffered onset. A pending transcript enters the next regular turn
+   without reopening the microphone or requiring activation again. Completed
+   sentences and an interruption marker enter local history; unspoken text does
+   not. A system note tells OpenClaw that its full stored reply was not necessarily
+   heard. With interruption disabled the mic stays closed during playback.
+   Piper/Whisper workers are joined on cancellation before their state is reused.
 
 After playback, the follow-up window opens. Rejected noise does not extend it.
 A goodbye closes the window; a new-conversation command resets the agent

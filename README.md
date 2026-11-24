@@ -141,6 +141,8 @@ selection, language practice, performance tuning, timings and Linux autostart.
 | `TTS_PROVIDER=piper` | Local bilingual TTS; `elevenlabs` enables paid cloud speech |
 | `PIPER_VOICE`, `PIPER_ENGLISH_VOICE` | Local RU/EN voices; run `setup --only tts` after changing them |
 | `FOLLOW_UP_WITHOUT_NAME=true` | Continue the conversation without repeating the name |
+| `BARGE_IN_ENABLED=true`, `BARGE_IN_MODE=name` | Interrupt replies by addressing the configured name; use `speech` with headphones |
+| `BARGE_IN_CHECK_INTERVAL_MS=1200` | Name-check cadence; local recognition adds processing time |
 | `LOG_TRANSCRIPTS=false` | Keep timings without logging recognized phrases |
 | `MUSIC_PAUSE_DURING_SPEECH=true` | Enable the music policy during spoken replies; `false` disables it |
 | `MUSIC_SPEECH_MODE=duck` | Smoothly lower music to 20% of the selected volume; `pause` suspends playback instead |
@@ -166,9 +168,14 @@ Legacy Deepgram/edge-tts support is available in the `cloud-speech` extra.
 
 - The microphone and default speech processing are local. Recognized requests
   are sent to the configured model; with ElevenLabs, reply text is sent there too.
-- The microphone is closed during playback. Interruption and acoustic echo
-  cancellation are not implemented. Name activation uses Whisper transcription,
-  so nearby speech and recognition errors can still cause false activations.
+- During playback, the microphone monitors for interruptions by the configured
+  name. The answer stops after recognition confirms the address, then the rest
+  of the question is recorded. Saying only the name or “Mira, stop” opens a
+  listening window without an acknowledgment. Name checks and a reply-text echo
+  guard reduce self-triggers; acoustic echo cancellation is not implemented.
+  Nearby speech, loud playback and recognition errors can still interfere.
+  `BARGE_IN_MODE=speech` interrupts on VAD without waiting for recognition and
+  requires headphones. `BARGE_IN_ENABLED=false` closes the mic during playback.
 - With `FOLLOW_UP_WITHOUT_NAME=true`, nearby speech may be treated as a follow-up
   while the conversation window is open. This is not speaker verification.
 - Rotating logs are local. With `LOG_TRANSCRIPTS=true`, they include recognized

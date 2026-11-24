@@ -105,6 +105,10 @@ class Settings(BaseSettings):
     vad_pre_roll_ms: int = Field(1000, ge=200, le=3000)
     conversation_timeout_s: float = Field(120, gt=0)
     follow_up_without_name: bool = True
+    barge_in_enabled: bool = True
+    barge_in_mode: Literal["name", "speech"] = "name"
+    barge_in_min_speech_ms: int = Field(300, ge=100, le=1000)
+    barge_in_check_interval_ms: int = Field(1200, ge=500, le=3000)
     max_utterance_s: float = Field(45, ge=1, le=300)
     audio_read_timeout_s: float = Field(3, gt=0)
     error_retry_delay_s: float = Field(2, gt=0)

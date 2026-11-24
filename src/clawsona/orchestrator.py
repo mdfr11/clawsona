@@ -54,6 +54,10 @@ class Orchestrator:
         self._music = music
         self._state = State.IDLE
         self._conversation_history: list[dict] = []
+        self._pending_transcript = None
+        self._interrupted_reply = False
+        self._interruption_context = False
+        self._barge_listener = None
 
     def _transition(self, new_state: State) -> None:
         logger.debug("State: %s → %s", self._state.value, new_state.value)
@@ -61,6 +65,7 @@ class Orchestrator:
 
     def reset_conversation(self) -> None:
         self._conversation_history.clear()
+        self._interruption_context = False
         if self._config.llm_provider == "openclaw":
             self._chat.reset_session()
 
@@ -106,10 +111,15 @@ class Orchestrator:
 
     async def _handle_turn(self, active, active_until, continuous, turn) -> float:
         loop = asyncio.get_running_loop()
+        self._interrupted_reply = False
         timeout = self._config.conversation_timeout_s
         if active and not continuous:
             timeout = max(0.001, active_until - loop.time())
-        transcript = await self._listen_and_transcribe(timeout_s=timeout)
+        if self._pending_transcript is not None:
+            transcript, self._pending_transcript = self._pending_transcript, None
+            active = True  # The interruption has already passed activation.
+        else:
+            transcript = await self._listen_and_transcribe(timeout_s=timeout)
         if transcript is None:
             if active and not continuous:
                 logger.info(
@@ -166,7 +176,7 @@ class Orchestrator:
             turn.result = "music_control"
             return (
                 loop.time() + self._config.conversation_timeout_s
-                if self._config.follow_up_without_name
+                if self._config.follow_up_without_name or self._interrupted_reply
                 else 0.0
             )
         command = self.command(transcript)
@@ -186,19 +196,129 @@ class Orchestrator:
             turn.result = "reset"
             return loop.time() + self._config.conversation_timeout_s
         await self._think_and_speak(transcript)
-        turn.result = "reply"
+        turn.result = "interrupted" if self._interrupted_reply else "reply"
         return (
             loop.time() + self._config.conversation_timeout_s
-            if name_only or self._config.follow_up_without_name
+            if name_only
+            or self._config.follow_up_without_name
+            or self._interrupted_reply
             else 0.0
         )
 
-    async def _speak(self, text):
-        async with self._pause_music():
-            with stage_timer(
-                "tts_total", provider=self._config.tts_provider, chars=len(text)
-            ):
-                await self._tts.speak(text)
+    async def _speak(self, text, *, interruptible=True):
+        async def speak():
+            async with self._pause_music():
+                with stage_timer(
+                    "tts_total", provider=self._config.tts_provider, chars=len(text)
+                ):
+                    await self._tts.speak(text)
+
+        if interruptible:
+            await self._with_barge_in(speak, lambda: text)
+        else:
+            await speak()
+
+    async def _with_barge_in(self, deliver, reply_text, speaking=None):
+        if not self._config.barge_in_enabled or self._audio is None:
+            await deliver()
+            return False
+        if self._barge_listener is None:
+            from clawsona.barge_in import BargeInListener
+
+            try:
+                self._barge_listener = BargeInListener(
+                    self._config, self._audio, self._stt
+                )
+            except Exception:
+                logger.warning(
+                    "Не удалось включить прерывание голосом для этого ответа"
+                )
+                await deliver()
+                return False
+        interrupted = asyncio.Event()
+
+        async def listen():
+            if speaking is not None:
+                await speaking.wait()
+            return await self._barge_listener.listen(interrupted.set, reply_text)
+
+        reply = asyncio.create_task(deliver())
+        listener = asyncio.create_task(listen())
+        signal = asyncio.create_task(interrupted.wait())
+        try:
+            done, _ = await asyncio.wait(
+                {reply, listener, signal}, return_when=asyncio.FIRST_COMPLETED
+            )
+            if interrupted.is_set():
+                self._interrupted_reply = self._interruption_context = True
+                logger.info("Ответ прерван пользователем; дослушиваю новую реплику")
+                async with self._pause_music():
+                    with stage_timer("barge_in_stop"):
+                        reply.cancel()
+                        await asyncio.gather(reply, return_exceptions=True)
+                    self._transition(State.LISTENING)
+                    try:
+                        transcript = await listener
+                    except Exception:
+                        logger.warning(
+                            "Не удалось распознать прерывание; жду следующую реплику"
+                        )
+                        transcript = ""
+                if transcript:
+                    from clawsona.barge_in import is_reply_echo
+                    from clawsona.wakeword import WakeWordDetector
+
+                    wake = WakeWordDetector(
+                        self._config.assistant_name, self._config.assistant_aliases
+                    )
+                    addressed = wake.extract(transcript)
+                    command = re.sub(
+                        r"[^\w\s]",
+                        "",
+                        (addressed if addressed is not None else transcript).casefold(),
+                    ).strip()
+                    # Saying only the name or asking for silence just opens the
+                    # listening window; it must not pause music or trigger an ack.
+                    silence = {
+                        "",
+                        "стоп",
+                        "хватит",
+                        "замолчи",
+                        "подожди",
+                        "помолчи",
+                        "stop",
+                        "wait",
+                        "be quiet",
+                        "quiet",
+                    }
+                    if command not in silence and (
+                        self._config.barge_in_mode == "speech"
+                        or not is_reply_echo(
+                            transcript,
+                            reply_text(),
+                            [
+                                self._config.assistant_name,
+                                *self._config.assistant_aliases,
+                            ],
+                        )
+                    ):
+                        self._pending_transcript = transcript
+                    if self._config.log_transcripts:
+                        log_dialogue("BARGE_IN_INPUT", text=transcript)
+                return True
+            if listener in done:
+                # A broken monitoring microphone must not discard a valid reply.
+                try:
+                    listener.result()
+                except Exception:
+                    logger.warning("Прерывание голосом недоступно для этого ответа")
+            await reply
+            return False
+        finally:
+            for task in (reply, listener, signal):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(reply, listener, signal, return_exceptions=True)
 
     async def _control_music(self, command, transcript):
         from clawsona.music import MusicControlError
@@ -396,8 +516,22 @@ class Orchestrator:
         ]
         if self._audio is not None:
             messages.insert(1, {"role": "system", "content": VOICE_INPUT_INSTRUCTIONS})
+        if self._interruption_context:
+            messages.insert(
+                1,
+                {
+                    "role": "system",
+                    "content": (
+                        "The user interrupted the previous spoken answer and may not "
+                        "have heard it in full. Respond to the new request; do not resume "
+                        "the interrupted answer unless asked."
+                    ),
+                },
+            )
         sentences: asyncio.Queue = asyncio.Queue(maxsize=4)
         response = []
+        completed_speech = []
+        speaking = asyncio.Event()
         first_sentence = True
         # OpenClaw supplies an already finalized reply. Splitting it into separate
         # cloud TTS calls adds a handshake and generation pause after every sentence.
@@ -454,10 +588,12 @@ class Orchestrator:
                         await speech.enter_async_context(self._pause_music())
                         started = True
                     self._transition(State.SPEAKING)
-                    await self._speak(sentence)
+                    speaking.set()
+                    await self._speak(sentence, interruptible=False)
+                    completed_speech.append(sentence)
             self._transition(State.THINKING)
 
-        with stage_timer("reply_total"):
+        async def deliver():
             async with AsyncExitStack() as stack:
                 prepare = getattr(self._tts, "prepare_reply", None)
                 if prepare is not None:
@@ -465,8 +601,24 @@ class Orchestrator:
                 async with asyncio.TaskGroup() as group:
                     group.create_task(produce())
                     group.create_task(consume())
+
+        with stage_timer("reply_total"):
+            interrupted = await self._with_barge_in(
+                deliver, lambda: "".join(response), speaking
+            )
+        if not interrupted:
+            self._interruption_context = False
         self._conversation_history = [
             *history,
             {"role": "user", "content": transcript},
-            {"role": "assistant", "content": "".join(response)},
+            {
+                "role": "assistant",
+                "content": (
+                    " ".join(
+                        [*completed_speech, "[Spoken answer interrupted by the user.]"]
+                    )
+                    if interrupted
+                    else "".join(response)
+                ),
+            },
         ]

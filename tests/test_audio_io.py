@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -79,6 +80,16 @@ def test_play_sync_calls_sounddevice(mocker):
 
     mock_play.assert_called_once()
     mock_wait.assert_called_once()
+
+
+def test_cancelled_playback_worker_cannot_start_late_audio(mocker):
+    from clawsona.audio_io import _play_sync
+
+    play = mocker.patch("sounddevice.play")
+    cancelled = threading.Event()
+    cancelled.set()
+    _play_sync(b"\0\0", cancelled=cancelled)
+    play.assert_not_called()
 
 
 def test_capture_does_not_reuse_previous_session(mocker):

@@ -87,6 +87,13 @@ async def async_main(config: Settings | None = None, *, music=None) -> None:
             "включён" if config.elevenlabs_fallback else "отключён",
         )
     activation = f"Скажи «{config.wake_word}»" if wakeword else "Говори после ответа"
+    if config.barge_in_enabled:
+        logger.info(
+            "Прерывание ответа: %s",
+            f"обращением по имени «{config.assistant_name}»"
+            if config.barge_in_mode == "name"
+            else "любой фразой (для наушников)",
+        )
     print(
         f"{config.assistant_name}: можно говорить. {activation}. Для выхода — Ctrl+C.",
         flush=True,

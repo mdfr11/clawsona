@@ -23,6 +23,7 @@ def make_orchestrator(**overrides):
                 "llm_provider": "deepseek",
                 "assistant_name": "Лютик",
                 "assistant_aliases": ["Lyutik", "Lutik"],
+                "barge_in_enabled": False,
             }
             | overrides
         ),
@@ -41,6 +42,148 @@ def make_orchestrator(**overrides):
     chat.chat_stream = stream
     tts = MagicMock(speak=AsyncMock())
     return Orchestrator(config, audio, wake, vad, stt, chat, tts)
+
+
+@pytest.mark.asyncio
+async def test_barge_in_cancels_output_and_generation_then_handles_complete_new_input():
+    orch = make_orchestrator(barge_in_enabled=True, follow_up_without_name=False)
+    output_stopped, generator_closed = asyncio.Event(), asyncio.Event()
+    input_complete = asyncio.Event()
+    received = []
+
+    async def stream(messages):
+        received.append(messages)
+        try:
+            yield "Очень длинный старый ответ. "
+            await asyncio.Event().wait()
+        finally:
+            generator_closed.set()
+
+    async def speak(text):
+        try:
+            await asyncio.Event().wait()
+        finally:
+            output_stopped.set()
+
+    async def listen(notify, reference):
+        assert "старый ответ" in reference()
+        notify()
+        await asyncio.wait_for(output_stopped.wait(), 1)
+        input_complete.set()
+        return "Лютик, теперь объясни дроби"
+
+    orch._barge_listener = MagicMock(listen=listen)
+    orch._chat.chat_stream = stream
+    orch._tts.speak.side_effect = speak
+    orch._listen_and_transcribe = AsyncMock(return_value="Лютик, первый вопрос")
+    turn = MagicMock()
+    deadline = await asyncio.wait_for(orch._handle_turn(False, 0, False, turn), 2)
+    assert input_complete.is_set() and generator_closed.is_set()
+    assert orch._pending_transcript == "Лютик, теперь объясни дроби"
+    assert turn.result == "interrupted" and deadline > asyncio.get_running_loop().time()
+    assert "Очень длинный" not in orch._conversation_history[-1]["content"]
+    assert "interrupted" in orch._conversation_history[-1]["content"]
+
+    # The already confirmed phrase goes through regular tool/command handling;
+    # no second microphone recording and no repeated name are required.
+    orch._config.barge_in_enabled = False
+    orch._tts.speak.side_effect = None
+
+    async def final_stream(messages):
+        received.append(messages)
+        yield "Объяснение дробей."
+
+    orch._chat.chat_stream = final_stream
+    await orch._handle_turn(False, 0, False, MagicMock())
+    orch._listen_and_transcribe.assert_awaited_once()
+    assert received[-1][-1]["content"] == "теперь объясни дроби"
+    assert any("may not have heard" in m["content"] for m in received[-1])
+    assert not orch._interruption_context
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("transcript", ["Лютик", "Лютик, стоп", "Lyutik, wait"])
+async def test_name_or_silence_interrupts_without_ack_or_music_control(transcript):
+    orch = make_orchestrator(barge_in_enabled=True)
+    stopped = asyncio.Event()
+
+    async def speak(text):
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+
+    async def listen(notify, reference):
+        notify()
+        await asyncio.wait_for(stopped.wait(), 1)
+        return transcript
+
+    orch._barge_listener = MagicMock(listen=listen)
+    orch._tts.speak.side_effect = speak
+    await asyncio.wait_for(orch._speak("Старый ответ"), 2)
+    assert orch._pending_transcript is None
+    assert orch._interrupted_reply
+    orch._tts.speak.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_monitor_failure_does_not_discard_reply_or_restart_output():
+    orch = make_orchestrator(barge_in_enabled=True)
+    orch._barge_listener = MagicMock(listen=AsyncMock(side_effect=RuntimeError("mic")))
+    await orch._think_and_speak("вопрос")
+    assert orch._tts.speak.await_count == 2
+    assert orch._conversation_history[-1]["content"] == "Привет. Давай поговорим!"
+
+
+@pytest.mark.asyncio
+async def test_barge_in_does_not_open_microphone_until_speech_starts():
+    orch = make_orchestrator(barge_in_enabled=True)
+    orch._barge_listener = MagicMock(listen=AsyncMock())
+
+    async def stream(messages):
+        orch._barge_listener.listen.assert_not_awaited()
+        raise RuntimeError("model unavailable")
+        yield
+
+    orch._chat.chat_stream = stream
+    with pytest.raises(ExceptionGroup):
+        await orch._think_and_speak("вопрос")
+    orch._barge_listener.listen.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_barge_in_preserves_music_speech_guard_until_user_finishes():
+    orch = make_orchestrator(barge_in_enabled=True)
+    depth = 0
+    stopped = asyncio.Event()
+
+    @asynccontextmanager
+    async def guard():
+        nonlocal depth
+        depth += 1
+        try:
+            yield
+        finally:
+            depth -= 1
+
+    async def speak(text):
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+
+    async def listen(notify, reference):
+        notify()
+        await asyncio.wait_for(stopped.wait(), 1)
+        assert depth > 0
+        return "Лютик, другой вопрос"
+
+    orch._music = MagicMock(pause_for_speech=guard, command=AsyncMock())
+    orch._barge_listener = MagicMock(listen=listen)
+    orch._tts.speak.side_effect = speak
+    await asyncio.wait_for(orch._speak("Старый ответ"), 2)
+    assert depth == 0
+    orch._music.command.assert_not_awaited()
 
 
 @pytest.mark.asyncio
