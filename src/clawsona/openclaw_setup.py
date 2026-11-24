@@ -48,6 +48,34 @@ def child_env(config):
     }
 
 
+def archive_default_workspace_templates(workspace, templates=None):
+    """Archive only exact bundled placeholders; keep personalized files intact."""
+    if templates is None:
+        binary = shutil.which("openclaw")
+        if not binary:
+            return []
+        templates = Path(binary).resolve().parent / "docs/reference/templates"
+    moved = []
+    backup = workspace / ".clawsona-template-backup"
+    for name in ("TOOLS.md", "IDENTITY.md", "USER.md", "HEARTBEAT.md", "BOOTSTRAP.md"):
+        source, template = workspace / name, templates / name
+        destination = backup / name
+        if not source.is_file() or not template.is_file() or destination.exists():
+            continue
+        default = template.read_text()
+        if default.startswith("---\n"):
+            _, separator, body = default[4:].partition("\n---\n")
+            if not separator:
+                continue
+            default = body
+        if source.read_text().strip() != default.strip():
+            continue
+        backup.mkdir(exist_ok=True, mode=0o700)
+        source.rename(destination)
+        moved.append(name)
+    return moved
+
+
 async def prepare_openclaw(config):
     command(config)
     if not config.deepseek_api_key:
@@ -92,8 +120,13 @@ async def prepare_openclaw(config):
             "defaults": {
                 "workspace": str(workspace),
                 "model": {"primary": "deepseek/deepseek-flash"},
-                "models": {"deepseek/deepseek-flash": {"params": {"maxTokens": 1024}}},
+                "models": {
+                    "deepseek/deepseek-flash": {
+                        "params": {"maxTokens": config.llm_max_tokens}
+                    }
+                },
                 "thinkingDefault": "off",
+                "skipBootstrap": True,
                 "heartbeat": {"every": "0m"},
                 "memorySearch": {"enabled": False},
             },
@@ -103,6 +136,7 @@ async def prepare_openclaw(config):
                     "name": config.assistant_name,
                     "default": True,
                     "workspace": str(workspace),
+                    "skills": [],
                 }
             ],
         },
@@ -170,6 +204,13 @@ async def prepare_openclaw(config):
     (workspace / "AGENTS.md").write_text(
         "Следуй SOUL.md. Для погоды, поиска и музыки используй только доступные инструменты. Не заявляй об успехе при ошибке инструмента.\n"
     )
+    archived = archive_default_workspace_templates(workspace)
+    if archived:
+        print(
+            "Стандартные шаблоны исключены из контекста; резервные копии: "
+            f"{workspace / '.clawsona-template-backup'}",
+            flush=True,
+        )
     update_env(
         {
             "LLM_PROVIDER": "openclaw",

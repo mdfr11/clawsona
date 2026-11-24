@@ -56,6 +56,11 @@ workspace instructions, plugin path and local tokens. The default provider is
 the official DeepSeek API. It does not modify the primary OpenClaw profile.
 Re-running setup rewrites the managed profile; custom edits need to be preserved
 separately. Setup takes a configuration backup before replacing an existing file.
+The generated agent has an empty skill allowlist: weather/search/music use its
+registered tools directly. Automatic bootstrap creation is disabled. Setup
+archives only untouched placeholders matching the installed OpenClaw templates
+to `workspace/.clawsona-template-backup`; personalized files remain in place.
+`LLM_MAX_TOKENS` also controls the OpenClaw model's output limit.
 
 The application starts a gateway if the configured local address is not already
 listening. On exit it terminates only a gateway it started. When using a separately

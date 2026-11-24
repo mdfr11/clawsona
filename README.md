@@ -144,6 +144,7 @@ selection, language practice, performance tuning, timings and Linux autostart.
 | `BARGE_IN_ENABLED=true`, `BARGE_IN_MODE=name` | Interrupt replies by addressing the configured name; use `speech` with headphones |
 | `BARGE_IN_CHECK_INTERVAL_MS=1200` | Name-check cadence; local recognition adds processing time |
 | `LOG_TRANSCRIPTS=false` | Keep timings without logging recognized phrases |
+| `LLM_MAX_TOKENS=384` | Reply output limit; for OpenClaw, rerun `openclaw-setup` and restart the gateway after changing it |
 | `MUSIC_PAUSE_DURING_SPEECH=true` | Enable the music policy during spoken replies; `false` disables it |
 | `MUSIC_SPEECH_MODE=duck` | Smoothly lower music to 20% of the selected volume; `pause` suspends playback instead |
 | `MUSIC_DUCK_RATIO=0.2`, `MUSIC_FADE_DURATION_MS=200` | Relative speech volume and fade duration |

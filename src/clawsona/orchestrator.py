@@ -494,8 +494,14 @@ class Orchestrator:
         provider_wait = 0.0
         chars = 0
         first = True
+        response_mode = (
+            "final" if self._config.llm_provider == "openclaw" else "streaming"
+        )
         with stage_timer(
-            "llm", provider=self._config.llm_provider, model=self._config.chat_model
+            "llm",
+            provider=self._config.llm_provider,
+            model=self._config.chat_model,
+            response_mode=response_mode,
         ) as metrics:
             async with aclosing(self._chat.chat_stream(messages)) as stream:
                 try:
@@ -510,7 +516,11 @@ class Orchestrator:
                         chars += len(chunk)
                         if first and chunk.strip():
                             first = False
-                            log_timing("llm_first_text", time.perf_counter() - started)
+                            log_timing(
+                                "llm_first_text",
+                                time.perf_counter() - started,
+                                response_mode=response_mode,
+                            )
                         yield chunk
                 finally:
                     metrics["provider_wait_ms"] = round(provider_wait * 1000, 3)
