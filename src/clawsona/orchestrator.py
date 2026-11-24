@@ -393,9 +393,8 @@ class Orchestrator:
                     if not speech_started:
                         timeout = min(timeout, max(0.001, deadline - loop.time()))
                     try:
-                        chunk = await asyncio.wait_for(
-                            self._audio.read_async(), timeout
-                        )
+                        async with asyncio.timeout(timeout):
+                            chunk = await self._audio.read_async()
                     except TimeoutError as exc:
                         if not speech_started and loop.time() >= deadline:
                             metrics["result"] = "timeout"

@@ -81,9 +81,10 @@ class BargeInListener:
         try:
             self._audio.start()
             while True:
-                chunk = await asyncio.wait_for(
-                    self._audio.read_async(), config.audio_read_timeout_s
-                )
+                # Unlike wait_for on Python 3.11, timeout does not lose an
+                # external cancellation racing with a completed audio read.
+                async with asyncio.timeout(config.audio_read_timeout_s):
+                    chunk = await self._audio.read_async()
                 event = self._vad.process_chunk(chunk)
                 frames += 1
                 recent.append(chunk)
